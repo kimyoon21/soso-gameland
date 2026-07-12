@@ -224,8 +224,8 @@
   }
   @keyframes crtflicker { 0%,100% { opacity: 1; } 96% { opacity: 1; } 97% { opacity: .86; } 98% { opacity: 1; } }
   #menuInner { animation: crtflicker 7s steps(1) infinite; position: relative; z-index: 2;
-    height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center;
-    padding: max(3vh, 18px) 20px; }
+    min-height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center;
+    padding: max(3vh, 18px) 20px; overflow-y: auto; }
 
   .marquee-top {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -352,6 +352,15 @@
         <span class="desc">8레인 트랙을 도는 졸라맨 계주!<br>반 바퀴마다 바톤 터치, 막판 역전</span>
         <span class="players">2-24 PLAYERS</span>
       </button>
+
+      <button class="cab" data-game="kart" style="--mc:#8b3ff0">
+        <span class="sel-arrow">▶</span>
+        <span class="marq" style="background:linear-gradient(90deg,#8b3ff0,#ff2d78)">KART DASH</span>
+        <span class="scr"><canvas data-icon="kart" width="252" height="130"></canvas></span>
+        <span class="kname">🏎️ 카트 레이싱</span>
+        <span class="desc">분기·합류 트랙을 10바퀴! 아이템 먹고<br>부딪히며 자동으로 펼치는 난전 레이스</span>
+        <span class="players">2-16 PLAYERS</span>
+      </button>
     </div>
 
     <div id="insertCoin">INSERT COIN — PRESS START</div>
@@ -469,6 +478,14 @@ window.Router = {
       kick: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
       hat: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
       leadWave: "square", bassWave: "triangle", leadVol: 0.05, bassVol: 0.05,
+    },
+    kart: { // 흥겨운 드라이빙 그루브 · 신나는 추격전 느낌
+      bpm: 140, steps: 16,
+      lead: ["E5", N, "G5", "A5", N, "G5", "E5", N, "D5", N, "E5", N, "B4", N, "D5", N],
+      bass: ["E3", "E3", N, "E3", "B2", "B2", N, "B2", "A2", "A2", N, "A2", "B2", "B2", N, "B2"],
+      kick: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+      hat: [0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1],
+      leadWave: "square", bassWave: "sawtooth", leadVol: 0.05, bassVol: 0.05,
     },
     victory: { // 결과 발표용 팡파레 — 4분음표로 넓게 뻗는 상승 아르페지오
       bpm: 132, steps: 16,
@@ -713,6 +730,31 @@ window.Router = {
       g.strokeStyle = "#fff"; g.lineWidth = 2;
       g.beginPath(); g.moveTo(W - 22, 16); g.lineTo(W - 22, H - 18); g.stroke();
       g.fillStyle = "#fff"; g.font = "10px monospace"; g.fillText("FIN", W - 44, 24);
+    } else if (kind === "kart") {
+      // 미니 트랙(분기 있는 루프) + 카트 두 대
+      g.strokeStyle = "#2a3054"; g.lineWidth = 16; g.lineCap = "round"; g.lineJoin = "round";
+      g.beginPath();
+      g.moveTo(30, H - 20); g.lineTo(W - 60, H - 20);
+      g.quadraticCurveTo(W - 20, H - 20, W - 20, H - 55);
+      g.lineTo(W - 20, 40);
+      g.quadraticCurveTo(W - 20, 14, W - 55, 14);
+      g.lineTo(60, 14);
+      g.quadraticCurveTo(20, 14, 20, 44);
+      g.lineTo(20, H - 55);
+      g.quadraticCurveTo(20, H - 20, 30, H - 20);
+      g.stroke();
+      g.strokeStyle = "rgba(255,255,255,.35)"; g.lineWidth = 3; g.setLineDash([6, 6]); g.stroke(); g.setLineDash([]);
+      function kartIcon(x, y, rot, col) {
+        g.save(); g.translate(x, y); g.rotate(rot);
+        g.fillStyle = "#1c2030"; g.fillRect(-9, -7, 4, 4); g.fillRect(5, -7, 4, 4); g.fillRect(-9, 3, 4, 4); g.fillRect(5, 3, 4, 4);
+        g.fillStyle = col; g.fillRect(-8, -5, 16, 10);
+        g.fillStyle = "#fff"; g.beginPath(); g.arc(3, 0, 2.6, 0, Math.PI * 2); g.fill();
+        g.restore();
+      }
+      kartIcon(W * 0.28, H - 20, 0, "#ff2d78");
+      kartIcon(W * 0.42, H - 20, 0, "#35f0e0");
+      g.fillStyle = "#f2a900"; g.font = "13px system-ui,sans-serif"; g.textAlign = "center";
+      g.fillText("❓", W * 0.5, 30);
     }
   }
 
@@ -3182,6 +3224,813 @@ window.Router = {
       resize(); backToSetup();
     },
     leave() { backToSetup(); },
+  };
+})();
+</script>
+
+<!-- ================= GAME 4: 카트 레이싱 ================= -->
+<style>
+  .kart-hud {
+    position: absolute; top: 14px; left: 14px; z-index: 10;
+    width: 210px; max-height: calc(100% - 28px); overflow-y: auto;
+    background: rgba(255,255,255,.72); border: 2px solid var(--ink);
+    border-radius: 12px; box-shadow: var(--shadow); padding: 10px 12px;
+    font-size: 12.5px;
+  }
+  .kart-hud h4 { margin: 0 0 8px; font-size: 13px; font-weight: 900; display: flex; justify-content: space-between; }
+  .kart-hud .lapn { color: var(--accent-deep); font-variant-numeric: tabular-nums; }
+  .kart-hud ol { margin: 0; padding-left: 18px; }
+  .kart-hud li { font-weight: 700; margin-bottom: 3px; display: flex; gap: 6px; align-items: center; }
+  .kart-hud li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kart-hud li .lp { color: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
+</style>
+
+<div id="game-kart" class="screen paper" hidden>
+  <canvas id="ktCanvas" class="stage"></canvas>
+  <div id="ktHud" class="kart-hud" hidden>
+    <h4><span>순위</span><span class="lapn" id="ktLapInfo">0/10 랩</span></h4>
+    <ol id="ktRankList"></ol>
+  </div>
+
+  <div id="ktControls" class="topctl" hidden>
+    <button id="ktRestart">↺ 다시 레이스</button>
+    <button id="ktBack">← 설정</button>
+    <button id="ktMenu2">🕹️ 오락실</button>
+  </div>
+
+  <div id="ktCountdown" class="cd-layer" aria-hidden="true"></div>
+
+  <div id="ktSetup" class="setup-layer">
+    <div class="card">
+      <h1 class="title">졸라 <span class="pop">카트 레이싱</span></h1>
+      <p class="subtitle">
+        이름을 한 줄에 하나씩. 직선·꼬불꼬불한 커브·<b>갈라졌다 합쳐지는 분기 구간</b>이 있는
+        트랙을 <b>10바퀴</b> 돌아 순위를 가립니다. 레인 구분 없이 전원이 자유롭게 경쟁하며
+        서로 부딪히고, 트랙에 뿅 나타나는 <b>아이템</b>(🍌🔥🚀💣✨)을 주워 알아서 사용합니다.
+      </p>
+
+      <label class="fieldlabel" for="ktNames">
+        <span>참가자 이름</span>
+        <span id="ktCount" class="countnum">0명</span>
+      </label>
+      <textarea id="ktNames" spellcheck="false" placeholder="브라운&#10;철수&#10;영희&#10;길동&#10;민수"></textarea>
+
+      <div class="row">
+        <button class="btn-primary" id="ktStart">🏁 레이스 시작</button>
+        <button class="btn-ghost" id="ktSample" title="12명 예시 채우기">예시 12명</button>
+        <button class="btn-ghost" id="ktMenu1" title="오락실로">🕹️</button>
+      </div>
+      <p class="hint">최소 2명 · 최대 16명. 조작 없이 전원 자동 주행 — 아이템 사용도 알아서 판단합니다.</p>
+    </div>
+  </div>
+
+  <div id="ktResult" class="result-layer">
+    <div class="winner-card">
+      <div class="winner-eyebrow">레이스 결과</div>
+      <div id="ktResultList" class="wlist"></div>
+      <div class="winner-actions">
+        <button class="btn-primary" id="ktAgain">↺ 다시 레이스</button>
+        <button class="btn-ghost" id="ktMenu3">🕹️ 오락실</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const screenEl = $("game-kart");
+  const canvas = $("ktCanvas"), ctx = canvas.getContext("2d");
+  const setupEl = $("ktSetup"), namesEl = $("ktNames"), countEl = $("ktCount");
+  const controls = $("ktControls"), cdEl = $("ktCountdown");
+  const resultEl = $("ktResult"), resultList = $("ktResultList");
+  const hudEl = $("ktHud"), lapInfoEl = $("ktLapInfo"), rankListEl = $("ktRankList");
+
+  const PALETTE = [
+    "#e23c1f", "#1f7ae0", "#27a85a", "#8b3ff0", "#f2a900",
+    "#e0408f", "#0fb3b3", "#7a5230", "#3b4cca", "#5a8f00",
+    "#c0407a", "#0a8fa0",
+  ];
+  const TOTAL_LAPS = 10;
+  const rFloat = (a, b) => a + Math.random() * (b - a);
+  const rInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // ---------- names ----------
+  function parseNames() {
+    return namesEl.value.split(/[\n,]/).map(s => s.trim()).filter(Boolean)
+      .map(s => s.length > 12 ? s.slice(0, 12) : s).slice(0, 16);
+  }
+  function updateCount() {
+    const n = parseNames().length;
+    countEl.textContent = n + "명";
+  }
+  namesEl.addEventListener("input", () => { Shared.names = namesEl.value; updateCount(); });
+  $("ktSample").addEventListener("click", () => {
+    const pool = ["브라운", "철수", "영희", "길동", "민수", "지은", "태형", "하늘", "준호", "서연", "도윤", "유나", "현우", "수빈", "민준", "채원"];
+    namesEl.value = pool.slice(0, 12).join("\n");
+    Shared.names = namesEl.value; updateCount();
+  });
+  for (const id of ["ktMenu1", "ktMenu2", "ktMenu3"]) $(id).addEventListener("click", () => Router.go("menu"));
+
+  // ================= 트랙 지오메트리 =================
+  // Catmull-Rom 스플라인으로 웨이포인트를 통과하는 매끄러운 경로를 만들고,
+  // 호 길이(arc-length) 테이블을 만들어 진행률(0~1)에 따라 등속으로 위치를 뽑는다.
+  // 분기 구간은 "픽셀 길이를 맞추는 것"이 아니라 "전체 랩 진행률 예산을 동일하게 배분"하는
+  // 방식으로 처리해서, 어느 분기를 타든 진행률 계산이 항상 일관되게 만든다.
+  const NOM_W = 1000, NOM_H = 640;
+
+  function catmullRom(p0, p1, p2, p3, t) {
+    const t2 = t * t, t3 = t2 * t;
+    const x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+    const y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+    return { x, y };
+  }
+  function buildLUT(waypoints, stepsPerSeg) {
+    const n = waypoints.length;
+    const pts = [];
+    for (let i = 0; i < n - 1; i++) {
+      const p0 = waypoints[Math.max(i - 1, 0)];
+      const p1 = waypoints[i];
+      const p2 = waypoints[i + 1];
+      const p3 = waypoints[Math.min(i + 2, n - 1)];
+      const stepsHere = i === n - 2 ? stepsPerSeg + 1 : stepsPerSeg; // 마지막 세그먼트만 끝점 포함(이음매 중복 방지)
+      for (let s = 0; s < stepsHere; s++) pts.push(catmullRom(p0, p1, p2, p3, s / stepsPerSeg));
+    }
+    let total = 0;
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) {
+      total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      cum.push(total);
+    }
+    return { pts, cum, total };
+  }
+  function sampleLUT(lut, frac) {
+    frac = Math.max(0, Math.min(1, frac));
+    const target = frac * lut.total;
+    let lo = 1, hi = lut.cum.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (lut.cum[mid] < target) lo = mid + 1; else hi = mid; }
+    const i = Math.max(1, lo);
+    const segLen = (lut.cum[i] - lut.cum[i - 1]) || 1e-6;
+    const t = (target - lut.cum[i - 1]) / segLen;
+    const a = lut.pts[i - 1], b = lut.pts[i];
+    const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+    return { x, y, angle };
+  }
+
+  // 웨이포인트(직선 → 우회전 → S자 꼬불 구간 → 분기 진입점)
+  const P0 = { x: 200, y: 560 };
+  const mainAWP = [
+    P0, { x: 500, y: 560 }, { x: 760, y: 560 }, { x: 860, y: 500 }, { x: 860, y: 380 },
+    { x: 800, y: 300 }, { x: 700, y: 260 }, { x: 650, y: 320 }, { x: 600, y: 260 },
+    { x: 520, y: 220 }, { x: 450, y: 210 },
+  ];
+  const FORK_OUT = mainAWP[mainAWP.length - 1];
+  const FORK_IN = { x: 250, y: 210 };
+  const forkAWP = [FORK_OUT, { x: 400, y: 150 }, { x: 330, y: 130 }, { x: 280, y: 150 }, FORK_IN]; // 하이로드 (넓게 도는 길)
+  const forkBWP = [FORK_OUT, { x: 380, y: 230 }, { x: 340, y: 190 }, { x: 300, y: 230 }, FORK_IN]; // 로우로드 (좁은 시케인)
+  // 합류 이후: 좌측을 타고 내려와 출발선으로 복귀 (mainB의 마지막 점은 반드시 P0과 동일해야 루프가 이어짐)
+  const mainBWP = [
+    FORK_IN, { x: 160, y: 220 }, { x: 100, y: 300 }, { x: 100, y: 420 },
+    { x: 140, y: 500 }, { x: 200, y: 550 }, { x: 200, y: 560 },
+  ];
+
+  const mainALUT = buildLUT(mainAWP, 22);
+  const forkALUT = buildLUT(forkAWP, 22);
+  const forkBLUT = buildLUT(forkBWP, 22);
+  const mainBLUT = buildLUT(mainBWP, 22);
+  // 분기 구간의 진행률 예산은 각 구간의 실제 호 길이 비율로 배분한다 (임의 상수 X) —
+  // 그래야 mainA/fork/mainB를 지날 때 화면상 속도가 균일하게 유지된다.
+  // (mainA≈1337 / fork평균≈260 / mainB≈497 단위 → 대략 0.638 / 0.124 / 0.238 비율)
+  const forkAvgLen = (forkALUT.total + forkBLUT.total) / 2;
+  const trackTotalLen = mainALUT.total + forkAvgLen + mainBLUT.total;
+  const FORK_START = mainALUT.total / trackTotalLen;
+  const FORK_END = FORK_START + forkAvgLen / trackTotalLen;
+
+  function trackSample(progress, branch) {
+    let f = ((progress % 1) + 1) % 1;
+    if (f < FORK_START) return sampleLUT(mainALUT, f / FORK_START);
+    if (f < FORK_END) return sampleLUT(branch === "A" ? forkALUT : forkBLUT, (f - FORK_START) / (FORK_END - FORK_START));
+    return sampleLUT(mainBLUT, (f - FORK_END) / (1 - FORK_END));
+  }
+  // 진행률 + 차선(레인, nominal 단위의 좌우 오프셋) + 분기선택 → nominal 좌표
+  function trackPosAt(progress, lane, branch) {
+    const p = trackSample(progress, branch);
+    const nx = -Math.sin(p.angle), ny = Math.cos(p.angle);
+    return { x: p.x + nx * lane, y: p.y + ny * lane, angle: p.angle };
+  }
+
+  const TRACK_HALF_W_NOM = 46; // 트랙 도로 폭(편측, nominal 단위)
+
+  // ---------- 화면 맞춤 변환 (nominal → screen) ----------
+  let TR = { scale: 1, offX: 0, offY: 0 };
+  let W = 0, H = 0, DPR = 1;
+  let trackPaths = null; // 리사이즈 때만 재계산되는 Path2D 캐시
+
+  function toScreen(nx, ny) { return { x: TR.offX + nx * TR.scale, y: TR.offY + ny * TR.scale }; }
+
+  function buildTrackPaths() {
+    function pathFromLUT(lut) {
+      const p = new Path2D();
+      const first = toScreen(lut.pts[0].x, lut.pts[0].y);
+      p.moveTo(first.x, first.y);
+      for (let i = 1; i < lut.pts.length; i++) {
+        const s = toScreen(lut.pts[i].x, lut.pts[i].y);
+        p.lineTo(s.x, s.y);
+      }
+      return p;
+    }
+    trackPaths = {
+      mainA: pathFromLUT(mainALUT), forkA: pathFromLUT(forkALUT),
+      forkB: pathFromLUT(forkBLUT), mainB: pathFromLUT(mainBLUT),
+    };
+  }
+
+  function computeTransform() {
+    const marginTop = 96, marginBot = 34, marginX = 40;
+    const availW = Math.max(100, W - marginX * 2), availH = Math.max(100, H - marginTop - marginBot);
+    const scale = Math.min(availW / NOM_W, availH / NOM_H);
+    TR.scale = scale;
+    TR.offX = (W - NOM_W * scale) / 2;
+    TR.offY = marginTop + (availH - NOM_H * scale) / 2;
+    buildTrackPaths();
+  }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    computeTransform();
+  }
+  window.addEventListener("resize", () => { if (!screenEl.hidden) resize(); });
+
+  // posAt: 화면좌표 + 각도 반환 (스케일 균일하므로 각도는 그대로 통과)
+  function posAtScreen(progress, laneNom, branch) {
+    const n = trackPosAt(progress, laneNom, branch);
+    const s = toScreen(n.x, n.y);
+    return { x: s.x, y: s.y, angle: n.angle };
+  }
+
+  // ================= 게임 상태 =================
+  let state = "idle"; // idle | countdown | racing | done
+  let karts = [], projectiles = [], hazards = [], pickups = [], particles = [], confetti = [];
+  let raceT = 0, firstFinishT = null, placesGiven = 0, nextPickupT = 0;
+  let cdStart = 0, cdLabel = "_";
+  let rafId = null, lastTs = 0;
+
+  const LAPS_PER_SEC_BASE = 1 / 5.2; // 랩 1개 기준 소요시간(노이즈 적용 전)
+  const LANE_MAX = TRACK_HALF_W_NOM * 0.72;
+  const COLLIDE_DIST_NOM = 20; // nominal 단위 충돌 판정 거리
+  const ITEM_TYPES = ["banana", "fireball", "boost", "bomb", "invincible"];
+  const ITEM_ICON = { banana: "🍌", fireball: "🔥", boost: "🚀", bomb: "💣", invincible: "✨" };
+  const raceProgress = kart => kart.lap + ((kart.progress % 1 + 1) % 1); // 랩 + 이번 랩 진행률(순위 비교용)
+
+  function makeKart(name, idx) {
+    return {
+      name, color: PALETTE[idx % PALETTE.length],
+      progress: rFloat(-0.01, 0.01), lane: rFloat(-LANE_MAX * 0.6, LANE_MAX * 0.6),
+      branch: Math.random() < 0.5 ? "A" : "B", forkLap: -1,
+      speedNoise: rFloat(0.88, 1.12), lap: 0, finished: false, place: 0,
+      boostT: 0, stunT: 0, spinT: 0, invincibleT: 0, wobble: 0,
+      item: null, itemPickedAt: 0, decisionAt: rFloat(0, 0.6),
+      sx: 0, sy: 0, angle: 0, recentHit: 0,
+    };
+  }
+
+  function start() {
+    const names = parseNames();
+    if (names.length < 2) return;
+    if (window.BGM) BGM.stop();
+    karts = names.map(makeKart);
+    projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
+    raceT = 0; firstFinishT = null; placesGiven = 0; nextPickupT = rFloat(1.5, 3);
+    state = "countdown"; cdStart = 0; cdLabel = "_";
+    setupEl.style.display = "none";
+    controls.hidden = false; hudEl.hidden = false;
+    resultEl.classList.remove("show");
+    if (!rafId) loopStart();
+  }
+  function backToSetup() {
+    state = "idle"; karts = []; projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
+    controls.hidden = true; hudEl.hidden = true;
+    resultEl.classList.remove("show");
+    cdEl.classList.remove("show"); cdEl.innerHTML = "";
+    setupEl.style.display = "flex";
+    stopLoop();
+    ctx.clearRect(0, 0, W, H);
+    updateCount();
+    if (window.BGM) BGM.start("menu");
+  }
+  $("ktStart").addEventListener("click", start);
+  $("ktBack").addEventListener("click", backToSetup);
+  $("ktRestart").addEventListener("click", () => { if (karts.length) start(); else backToSetup(); });
+  $("ktAgain").addEventListener("click", () => { resultEl.classList.remove("show"); start(); });
+
+  // ---------- 아이템/투사체/장애물 ----------
+  function spawnPickup() {
+    if (pickups.length >= 3) return;
+    // 분기 구간 안에는 스폰하지 않는다 — 픽업 렌더링/획득 판정이 branch "A" 기준 고정이라
+    // 분기 구간 안에 놓이면 branch B를 탄 카트에게는 사실상 닿을 수 없는 아이템이 되어버린다.
+    const progress = Math.random() < 0.5
+      ? rFloat(0.03, FORK_START - 0.02)
+      : rFloat(FORK_END + 0.02, 0.97);
+    const lane = rFloat(-LANE_MAX, LANE_MAX);
+    pickups.push({ progress, lane, popT: 0 });
+    beep(980, 0.05, "square", 0.03);
+  }
+  function addFloat(x, y, text, color) {
+    particles.push({ type: "txt", x, y, vy: -0.7, life: 1, text, color });
+  }
+  function addBurst(x, y, color, n = 8) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      particles.push({ type: "dust", x, y, vx: Math.cos(a) * rFloat(1, 3), vy: Math.sin(a) * rFloat(1, 3), life: 1, color });
+    }
+  }
+  function nearbyKarts(kart, rangeNom) {
+    const out = [];
+    for (const o of karts) {
+      if (o === kart || o.finished) continue;
+      let d = ((o.progress - kart.progress) % 1 + 1) % 1; // 0~1, kart 기준 앞쪽으로의 거리
+      if (d > 0.5) d -= 1; // -0.5~0.5로 정규화 (음수면 뒤쪽)
+      const distNom = Math.abs(d) * trackTotalLen;
+      if (distNom < rangeNom) out.push({ other: o, ahead: d > 0, distNom });
+    }
+    return out;
+  }
+  function useItem(kart) {
+    const kind = kart.item;
+    kart.item = null;
+    if (kind === "fireball") {
+      projectiles.push({ owner: kart, progress: kart.progress, lane: kart.lane, life: 3.2 });
+      beep(1500, 0.09, "square", 0.045, 500);
+    } else if (kind === "boost") {
+      kart.boostT = 2.6;
+      beep(500, 0.16, "sawtooth", 0.05, 1400);
+    } else if (kind === "banana") {
+      hazards.push({ kind: "banana", progress: kart.progress - 0.006, lane: kart.lane, owner: kart });
+      beep(320, 0.08, "triangle", 0.04);
+    } else if (kind === "bomb") {
+      detonateBomb(kart);
+    } else if (kind === "invincible") {
+      kart.invincibleT = 3.4;
+      beep(1200, 0.05, "sine", 0.04); setTimeout(() => beep(1600, 0.08, "sine", 0.04), 60);
+    }
+  }
+  function applyEffect(target, kind, fromAngle) {
+    if (target.invincibleT > 0) return; // 무적: 모든 공격 무효
+    if (target.item === "bomb" && (kind === "fire" || kind === "bomb")) { detonateBomb(target); return; }
+    if (kind === "spin") { target.spinT = 1.1; target.wobble = 1; }
+    else if (kind === "stun" || kind === "bomb" || kind === "fire") { // fire(파이어볼 직격)와 bomb(폭발 반경) 모두 동일한 스턴/넉백
+      target.stunT = 0.9; target.wobble = 1;
+      target.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, target.lane + Math.cos(fromAngle || 0) * rFloat(-6, 6)));
+    }
+    target.recentHit = 2.5;
+    const p = posAtScreen(target.progress, target.lane, target.branch);
+    addBurst(p.x, p.y, target.color, 6);
+  }
+  function detonateBomb(kart) {
+    kart.item = null;
+    const p = posAtScreen(kart.progress, kart.lane, kart.branch);
+    noiseSfx(0.22, 0.1, 700); beep(90, 0.22, "sine", 0.05, 40);
+    addBurst(p.x, p.y, "#f2a900", 16);
+    for (const o of karts) {
+      if (o === kart || o.finished) continue;
+      const op = posAtScreen(o.progress, o.lane, o.branch);
+      if (Math.hypot(op.x - p.x, op.y - p.y) < 70 * TR.scale) applyEffect(o, "bomb", 0);
+    }
+    applyEffect(kart, "bomb", 0); // 사용자 본인도 폭발 반경 안 — 스스로도 잠깐 스턴
+  }
+
+  function decideItemUse(kart, dt) {
+    kart.decisionAt -= dt;
+    if (kart.decisionAt > 0 || !kart.item) return;
+    kart.decisionAt = rFloat(0.35, 0.55);
+    const held = raceT - kart.itemPickedAt;
+    const near = nearbyKarts(kart, 55);
+    if (kart.item === "fireball") {
+      if (near.some(n => n.ahead) || held > 6) useItem(kart);
+    } else if (kart.item === "bomb") {
+      if (near.length || held > 7) useItem(kart);
+    } else if (kart.item === "boost") {
+      const leaderProgress = Math.max(...karts.map(raceProgress));
+      const myProgress = raceProgress(kart);
+      if (leaderProgress - myProgress > 0.15 || kart.recentHit > 0 || held > 5) useItem(kart);
+    } else if (kart.item === "banana") {
+      if (near.some(n => !n.ahead) || held > 5) useItem(kart);
+    } else if (kart.item === "invincible") {
+      if (near.length || held > 4) useItem(kart);
+    }
+  }
+
+  // ---------- 시뮬레이션 업데이트 ----------
+  function update(dt) {
+    const ds = dt / 1000;
+    raceT += ds;
+
+    nextPickupT -= ds;
+    if (nextPickupT <= 0) { spawnPickup(); nextPickupT = rFloat(1.8, 3.4); }
+
+    for (const kart of karts) {
+      if (kart.wobble > 0) kart.wobble -= ds * 1.6;
+      if (kart.recentHit > 0) kart.recentHit -= ds;
+      if (kart.finished) continue;
+
+      if (kart.boostT > 0) kart.boostT -= ds;
+      if (kart.stunT > 0) kart.stunT -= ds;
+      if (kart.spinT > 0) kart.spinT -= ds;
+      if (kart.invincibleT > 0) kart.invincibleT -= ds;
+
+      const mult = (kart.stunT > 0 ? 0.16 : 1) * (kart.spinT > 0 ? 0.28 : 1) * (kart.boostT > 0 ? 1.85 : 1);
+      kart.progress += kart.speedNoise * mult * LAPS_PER_SEC_BASE * ds;
+
+      // 분기 진입 시 이번 랩의 분기 선택을 한 번만 굴린다
+      const fracNow = ((kart.progress % 1) + 1) % 1;
+      const curLap = Math.floor(kart.progress);
+      if (fracNow >= FORK_START && fracNow < FORK_END && kart.forkLap !== curLap) {
+        kart.branch = Math.random() < 0.5 ? "A" : "B";
+        kart.forkLap = curLap;
+      }
+
+      if (curLap > kart.lap) {
+        kart.lap = curLap;
+        if (kart.lap >= TOTAL_LAPS) {
+          kart.finished = true; kart.place = ++placesGiven;
+          if (firstFinishT === null) {
+            firstFinishT = raceT;
+            beep(880, 0.1); setTimeout(() => beep(1175, 0.12), 110); setTimeout(() => beep(1568, 0.2), 240);
+            if (!reduceMotion) launchConfetti(kart.color);
+          } else beep(660, 0.08);
+        }
+      }
+
+      decideItemUse(kart, ds);
+
+      const p = posAtScreen(kart.progress, kart.lane, kart.branch);
+      kart.sx = p.x; kart.sy = p.y; kart.angle = p.angle;
+    }
+
+    // 카트-카트 물리 충돌 (겹치지 않도록 좌우로 밀어내기)
+    const active = karts.filter(k => !k.finished);
+    for (let i = 0; i < active.length; i++) {
+      for (let j = i + 1; j < active.length; j++) {
+        const a = active[i], b = active[j];
+        const dist = Math.hypot(a.sx - b.sx, a.sy - b.sy);
+        const threshold = COLLIDE_DIST_NOM * TR.scale;
+        if (dist < threshold && dist > 0.01) {
+          const push = (threshold - dist) / threshold;
+          const dir = a.lane <= b.lane ? -1 : 1;
+          if (a.invincibleT <= 0) a.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, a.lane + dir * push * 5));
+          if (b.invincibleT <= 0) b.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, b.lane - dir * push * 5));
+          sfxThrottle("kt-bump", 90, () => beep(200, 0.05, "square", 0.03));
+          if (a.invincibleT <= 0 && b.invincibleT <= 0) { a.stunT = Math.max(a.stunT, 0.12); b.stunT = Math.max(b.stunT, 0.12); }
+        }
+      }
+    }
+
+    // 투사체(파이어볼) 이동/충돌
+    for (const pr of projectiles) {
+      pr.life -= ds; pr.progress += 0.62 * ds; // 카트보다 훨씬 빠르게 전진
+      const pp = posAtScreen(pr.progress, pr.lane, pr.owner.branch);
+      pr.sx = pp.x; pr.sy = pp.y;
+      for (const k of karts) {
+        if (k === pr.owner || k.finished) continue;
+        const kp = posAtScreen(k.progress, k.lane, k.branch);
+        if (Math.hypot(kp.x - pp.x, kp.y - pp.y) < 22 * TR.scale) {
+          applyEffect(k, "fire", pp.angle);
+          beep(180, 0.1, "sawtooth", 0.05);
+          pr.life = -1;
+          break;
+        }
+      }
+    }
+    projectiles = projectiles.filter(pr => pr.life > 0);
+
+    // 바나나(장애물) — 지나가는 카트가 밟으면 스핀
+    for (const hz of hazards) {
+      if (hz.hit) continue;
+      const hp = posAtScreen(hz.progress, hz.lane, hz.owner.branch);
+      hz.sx = hp.x; hz.sy = hp.y;
+      for (const k of karts) {
+        if (k === hz.owner || k.finished) continue;
+        const kp = posAtScreen(k.progress, k.lane, k.branch);
+        if (Math.hypot(kp.x - hp.x, kp.y - hp.y) < 18 * TR.scale) {
+          applyEffect(k, "spin", 0);
+          beep(240, 0.12, "sawtooth", 0.04);
+          hz.hit = true;
+          break;
+        }
+      }
+    }
+    hazards = hazards.filter(hz => !hz.hit);
+
+    // 아이템 픽업 자동 획득 (이미 아이템 보유자는 스킵)
+    for (const pk of pickups) {
+      pk.popT = Math.min(1, pk.popT + ds * 3);
+      if (pk.taken) continue;
+      const pp = posAtScreen(pk.progress, pk.lane, "A"); // 픽업은 항상 분기 구간 밖에만 스폰되므로(spawnPickup 참고) branch 인자는 무시됨
+      for (const k of karts) {
+        if (k.item || k.finished) continue;
+        const kp = posAtScreen(k.progress, k.lane, k.branch);
+        if (Math.hypot(kp.x - pp.x, kp.y - pp.y) < 26 * TR.scale) {
+          k.item = ITEM_TYPES[rInt(0, ITEM_TYPES.length - 1)];
+          k.itemPickedAt = raceT;
+          pk.taken = true;
+          beep(1100, 0.07, "square", 0.04, 1500);
+          addFloat(kp.x, kp.y - 30, ITEM_ICON[k.item] + " 획득!", k.color);
+          break;
+        }
+      }
+    }
+    pickups = pickups.filter(pk => !pk.taken);
+
+    for (const p of particles) {
+      if (p.type === "txt") { p.y += p.vy; p.life -= 0.014; }
+      else { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life -= 0.045; }
+    }
+    particles = particles.filter(p => p.life > 0);
+    for (const c of confetti) { c.x += c.vx; c.y += c.vy; c.vy += 0.12; c.rot += c.vr; c.life -= 0.006; }
+    confetti = confetti.filter(c => c.life > 0 && c.y < H + 30);
+
+    if (state === "racing" && firstFinishT !== null && raceT - firstFinishT > 12) {
+      // 남은 카트는 실제 진행률(랩+구간진행) 내림차순으로 등수를 매긴다 (배열 순서로 매기면 순위가 왜곡됨)
+      [...karts].filter(k => !k.finished)
+        .sort((a, b) => raceProgress(b) - raceProgress(a))
+        .forEach(k => { k.finished = true; k.place = ++placesGiven; });
+    }
+    if (state === "racing" && karts.length && karts.every(k => k.finished)) {
+      state = "done";
+      setTimeout(showResults, 700);
+    }
+  }
+
+  function launchConfetti(theme) {
+    const colors = [theme, "#ff5a3c", "#f2a900", "#1f7ae0", "#27a85a", "#e0408f"];
+    for (let i = 0; i < 110; i++) {
+      confetti.push({ x: W / 2 + rFloat(-100, 100), y: 40, vx: rFloat(-4, 4), vy: rFloat(-2, 2),
+        rot: Math.random() * Math.PI, vr: rFloat(-0.2, 0.2), size: rFloat(5, 11), color: colors[i % colors.length], life: 1 });
+    }
+  }
+
+  function showResults() {
+    if (window.BGM) { BGM.stop(); BGM.start("victory"); BGM.fanfare(); }
+    const order = [...karts].sort((a, b) => a.place - b.place);
+    resultList.innerHTML = order.map(k => {
+      const gold = k.place === 1 ? " gold" : "";
+      return `<div class="wrow${gold}"><span class="wrank">${k.place}등</span>` +
+        `<span class="wname" style="color:${k.color}">${escapeHtml(k.name)}</span>` +
+        `<span class="wweap">${k.place === 1 ? "🏆" : k.place === 2 ? "🥈" : k.place === 3 ? "🥉" : ""}</span></div>`;
+    }).join("");
+    resultEl.classList.add("show");
+  }
+
+  // ================= 렌더링 =================
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function clipText(text, maxW) {
+    if (ctx.measureText(text).width <= maxW) return text;
+    let t = text;
+    while (t.length && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+    return t.length ? t + "…" : "";
+  }
+
+  function drawTrack() {
+    if (!trackPaths) return;
+    const roadW = TRACK_HALF_W_NOM * 2 * TR.scale;
+    ctx.save();
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    // 어두운 테두리 먼저, 그 위에 밝은 도로면
+    for (const key of ["mainA", "forkA", "forkB", "mainB"]) {
+      ctx.lineWidth = roadW + 7; ctx.strokeStyle = "#1c2030"; ctx.stroke(trackPaths[key]);
+    }
+    for (const key of ["mainA", "forkA", "forkB", "mainB"]) {
+      ctx.lineWidth = roadW; ctx.strokeStyle = "rgba(255,255,255,.86)"; ctx.stroke(trackPaths[key]);
+    }
+    // 중앙 점선
+    ctx.setLineDash([10, 12]); ctx.lineWidth = 2; ctx.strokeStyle = "rgba(28,32,48,.22)";
+    for (const key of ["mainA", "forkA", "forkB", "mainB"]) ctx.stroke(trackPaths[key]);
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // 출발/결승선 (체크무늬) — mainA 시작점 부근
+    const startP = posAtScreen(0, 0, "A");
+    const dirP = posAtScreen(0.006, 0, "A");
+    const ang = Math.atan2(dirP.y - startP.y, dirP.x - startP.x);
+    ctx.save();
+    ctx.translate(startP.x, startP.y); ctx.rotate(ang + Math.PI / 2);
+    const half = roadW / 2;
+    for (let i = -1; i <= 1; i += 2) {
+      for (let s = -half; s < half; s += 8) {
+        ctx.fillStyle = (Math.floor((s + half) / 8) % 2 === 0) ? "#1c2030" : "#fff";
+        ctx.fillRect(i * 4, s, 4, 8);
+      }
+    }
+    ctx.restore();
+    ctx.save();
+    ctx.font = "900 12px system-ui,sans-serif"; ctx.fillStyle = "#1c2030"; ctx.textAlign = "center";
+    ctx.fillText("🏁 START/FINISH", startP.x, startP.y - roadW / 2 - 10);
+    ctx.restore();
+
+    // 분기 안내 라벨
+    const forkOutP = posAtScreen(FORK_START, 0, "A");
+    const forkInP = posAtScreen(FORK_END, 0, "A");
+    ctx.save();
+    ctx.font = "900 11px system-ui,sans-serif"; ctx.fillStyle = "#5b6172"; ctx.textAlign = "center";
+    ctx.fillText("⑂ 분기", forkOutP.x, forkOutP.y - roadW / 2 - 8);
+    ctx.fillText("⑃ 합류", forkInP.x, forkInP.y - roadW / 2 - 8);
+    ctx.restore();
+  }
+
+  function drawKartShape(k) {
+    const spin = k.spinT > 0 ? Math.sin(raceT * 26) * 0.6 : 0;
+    const wobbleRot = k.wobble > 0.02 ? Math.sin(k.wobble * 8) * 0.15 * k.wobble : 0;
+    ctx.save();
+    ctx.translate(k.sx, k.sy);
+    ctx.rotate(k.angle + spin + wobbleRot);
+    const s = Math.max(0.72, Math.min(1.15, TR.scale * 1.15));
+    ctx.scale(s, s);
+
+    if (k.invincibleT > 0) {
+      ctx.save(); ctx.globalAlpha = 0.35 + Math.sin(raceT * 14) * 0.15;
+      ctx.strokeStyle = "#35f0e0"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    if (k.boostT > 0) {
+      ctx.save(); ctx.globalAlpha = 0.7;
+      ctx.fillStyle = "#ff9a3c";
+      ctx.beginPath();
+      ctx.moveTo(-14, -5); ctx.lineTo(-14 - 10 - Math.random() * 8, 0); ctx.lineTo(-14, 5);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.globalAlpha = k.invincibleT > 0 ? 0.75 : 1;
+    // 그림자
+    ctx.save(); ctx.globalAlpha *= 0.15; ctx.fillStyle = "#1c2030";
+    ctx.beginPath(); ctx.ellipse(1, 2, 15, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+
+    // 바퀴
+    ctx.fillStyle = "#1c2030";
+    ctx.fillRect(-13, -10, 6, 5); ctx.fillRect(7, -10, 6, 5);
+    ctx.fillRect(-13, 5, 6, 5); ctx.fillRect(7, 5, 6, 5);
+    // 차체
+    ctx.fillStyle = k.color;
+    roundRect(-14, -8, 26, 16, 5); ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "#1c2030"; roundRect(-14, -8, 26, 16, 5); ctx.stroke();
+    // 운전자/창
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(4, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = k.color; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // 이름표
+    ctx.save();
+    const label = k.name + (k.item ? " " + ITEM_ICON[k.item] : "");
+    ctx.font = "800 11.5px 'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const tw = ctx.measureText(label).width;
+    const bw = tw + 12, bh = 18, bx = k.sx - bw / 2, by = k.sy - 30;
+    roundRect(bx, by, bw, bh, 6); ctx.fillStyle = "#fff"; ctx.fill();
+    ctx.lineWidth = 1.8; ctx.strokeStyle = k.color; ctx.stroke();
+    ctx.fillStyle = "#1c2030"; ctx.fillText(label, k.sx, by + bh / 2 + 0.5);
+    ctx.restore();
+  }
+
+  function drawPickup(pk) {
+    if (pk.taken) return;
+    const p = posAtScreen(pk.progress, pk.lane, "A");
+    const s = Math.min(1, pk.popT) * (1 + Math.sin(raceT * 6 + pk.lane) * 0.06);
+    ctx.save();
+    ctx.translate(p.x, p.y); ctx.scale(s, s);
+    roundRect(-13, -13, 26, 26, 7);
+    ctx.fillStyle = "#fff"; ctx.fill();
+    ctx.lineWidth = 2.4; ctx.strokeStyle = "#f2a900"; ctx.stroke();
+    ctx.font = "16px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("❓", 0, 1);
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    if (state === "idle") return;
+    drawTrack();
+    for (const pk of pickups) drawPickup(pk);
+    for (const hz of hazards) {
+      ctx.save(); ctx.font = "18px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("🍌", hz.sx || 0, hz.sy || 0); ctx.restore();
+    }
+    for (const pr of projectiles) {
+      ctx.save(); ctx.font = "18px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("🔥", pr.sx || 0, pr.sy || 0); ctx.restore();
+    }
+    // y좌표 기준 정렬 후 그리기 — 화면 아래쪽 카트가 위쪽 카트를 가리도록
+    const order = [...karts].sort((a, b) => a.sy - b.sy);
+    for (const k of order) drawKartShape(k);
+
+    for (const p of particles) {
+      ctx.save(); ctx.globalAlpha = Math.max(0, p.life);
+      if (p.type === "txt") {
+        ctx.font = "800 13px 'Apple SD Gothic Neo',system-ui,sans-serif"; ctx.textAlign = "center";
+        ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.strokeText(p.text, p.x, p.y);
+        ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+      } else {
+        ctx.fillStyle = p.color || "#aeb8c6";
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3 * p.life + 1, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    for (const c of confetti) {
+      ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, c.life * 1.4));
+      ctx.translate(c.x, c.y); ctx.rotate(c.rot); ctx.fillStyle = c.color;
+      ctx.fillRect(-c.size / 2, -c.size / 2, c.size, c.size * 0.6); ctx.restore();
+    }
+
+    if (state === "racing" || state === "done") drawHud();
+  }
+
+  function drawHud() {
+    const ranked = [...karts].sort((a, b) => {
+      if (a.finished && b.finished) return a.place - b.place;
+      if (a.finished) return -1; if (b.finished) return 1;
+      return raceProgress(b) - raceProgress(a);
+    });
+    const leadLap = Math.min(TOTAL_LAPS, Math.max(...karts.map(k => k.finished ? TOTAL_LAPS : k.lap + 1)));
+    lapInfoEl.textContent = leadLap + "/" + TOTAL_LAPS + " 랩";
+    rankListEl.innerHTML = ranked.map((k, i) => {
+      const rank = k.finished ? k.place : i + 1;
+      return `<li><span style="color:${k.color}">●</span><span class="nm">${escapeHtml(k.name)}</span>` +
+        `<span class="lp">${k.finished ? rank + "등" : rank + "위"}</span></li>`;
+    }).join("");
+  }
+
+  function showCd(label) {
+    if (!label) { cdEl.classList.remove("show"); cdEl.innerHTML = ""; return; }
+    cdEl.classList.add("show");
+    const go = label === "GO!";
+    cdEl.innerHTML = `<div class="num anim${go ? " fight" : ""}">${label}</div>`;
+  }
+
+  function loopStart() {
+    lastTs = 0;
+    const tick = (ts) => {
+      rafId = requestAnimationFrame(tick);
+      if (!lastTs) lastTs = ts;
+      let dt = ts - lastTs; lastTs = ts;
+      if (dt > 200) dt = 200;
+
+      if (state === "countdown") {
+        if (!cdStart) cdStart = ts;
+        const el = ts - cdStart;
+        let label;
+        if (el < 900) label = "3";
+        else if (el < 1800) label = "2";
+        else if (el < 2700) label = "1";
+        else if (el < 3400) label = "GO!";
+        else { state = "racing"; label = ""; if (window.BGM) BGM.start("kart"); }
+        if (label !== cdLabel) {
+          cdLabel = label; showCd(label);
+          if (label === "GO!") { noiseSfx(0.16, 0.1, 2400); beep(1300, 0.14, "sawtooth", 0.05); }
+          else if (label) beep(520, 0.08);
+        }
+      } else if (state === "racing" || state === "done") {
+        update(dt);
+      }
+      draw();
+    };
+    rafId = requestAnimationFrame(tick);
+  }
+  function stopLoop() { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } lastTs = 0; }
+
+  updateCount();
+
+  Games.kart = {
+    enter() {
+      if (!namesEl.value.trim() && Shared.names) namesEl.value = Shared.names;
+      resize(); backToSetup();
+    },
+    leave() { backToSetup(); },
+  };
+
+  // 디버그/검증용 훅 — 레이스 진행 상태를 외부에서 확인 가능하게 노출
+  window.__ktDebug = {
+    get state() { return state; },
+    get karts() { return karts; },
+    get pickups() { return pickups; },
+    get hazards() { return hazards; },
+    get projectiles() { return projectiles; },
   };
 })();
 </script>
