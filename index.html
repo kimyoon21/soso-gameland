@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Healing Paper 오락실</title>
+<title>SOSO GAMELAND</title>
 <meta name="description" content="레트로 오락실에서 게임을 골라 랜덤 추첨 — 배틀로얄·사다리타기·계주 달리기">
 </head>
 <body>
@@ -308,8 +308,8 @@
 <div id="menu" class="screen">
   <div id="menuInner">
     <div class="marquee-top">RANDOM PICKER SERIES</div>
-    <canvas id="logoCanvas" width="10" height="10" aria-label="HP GAMELAND"></canvas>
-    <div class="menu-sub">힐 링 페 이 퍼 &nbsp;오 락 실</div>
+    <canvas id="logoCanvas" width="10" height="10" aria-label="SOSO GAMELAND"></canvas>
+    <div class="menu-sub">소 소 한 &nbsp;오 락 실</div>
     <div class="menu-caption"><b>◀ ▶</b> SELECT &nbsp;·&nbsp; <b>ENTER</b> START &nbsp;·&nbsp; CLICK OK</div>
 
     <div id="cabRow">
@@ -342,7 +342,7 @@
     </div>
 
     <div id="insertCoin">INSERT COIN — PRESS START</div>
-    <div class="menu-credit">© 2026 HEALING PAPER · 1 CREDIT = FREE PLAY</div>
+    <div class="menu-credit">© 2026 SOSO GAMELAND · 1 CREDIT = FREE PLAY</div>
   </div>
 </div>
 
@@ -412,8 +412,8 @@ window.Router = {
 
   // --- 픽셀 비트맵 로고 ---
   const GLYPHS = {
-    H: ["#...#","#...#","#...#","#####","#...#","#...#","#...#"],
-    P: ["####.","#...#","#...#","####.","#....","#....","#...."],
+    S: [".####","#....","#....",".###.","....#","....#","####."],
+    O: [".###.","#...#","#...#","#...#","#...#","#...#",".###."],
     G: [".###.","#...#","#....","#.###","#...#","#...#",".###."],
     A: [".###.","#...#","#...#","#####","#...#","#...#","#...#"],
     M: ["#...#","##.##","#.#.#","#.#.#","#...#","#...#","#...#"],
@@ -424,7 +424,7 @@ window.Router = {
     " ": [".....",".....",".....",".....",".....",".....","....."],
   };
   function drawLogo() {
-    const text = "HP GAMELAND";
+    const text = "SOSO GAMELAND";
     const px = Math.max(4, Math.min(7, Math.floor(window.innerWidth / 130)));
     const cw = 6, gh = 7;
     const c = document.getElementById("logoCanvas");
@@ -582,7 +582,7 @@ window.Router = {
   <!-- Setup -->
   <div id="setup">
     <div class="card">
-      <h1 class="title">Healing&nbsp;Paper <span class="pop">Battle&nbsp;Royale</span></h1>
+      <h1 class="title">졸라맨 <span class="pop">배틀로얄</span></h1>
       <p class="subtitle">
         이름을 한 줄에 하나씩 넣으세요. 졸라맨들이 흩어져 나타나 3초간 숨을 고른 뒤,
         각자 <b>무작위 무기</b>를 들고 링에서 치고받습니다. 지정한 <b>당선자</b>를 가립니다!
