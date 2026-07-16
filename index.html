@@ -3390,8 +3390,10 @@ window.Router = {
   ];
   const FORK_OUT = mainAWP[mainAWP.length - 1];
   const FORK_IN = { x: 250, y: 210 };
-  const forkAWP = [FORK_OUT, { x: 400, y: 150 }, { x: 330, y: 130 }, { x: 280, y: 150 }, FORK_IN]; // 하이로드 (넓게 도는 길)
-  const forkBWP = [FORK_OUT, { x: 380, y: 230 }, { x: 340, y: 190 }, { x: 300, y: 230 }, FORK_IN]; // 로우로드 (좁은 시케인)
+  // 직선 급행로: 완만하게 크게 스윙 (턴각이 작아 "쭉 뻗은" 느낌, 대신 길이는 길다)
+  const forkAWP = [FORK_OUT, { x: 395, y: 30 }, { x: 305, y: 30 }, FORK_IN];
+  // 숏컷: 직선 경로에 바짝 붙은 좁은 지그재그 (턴각이 커 "구불구불"하지만 길이는 짧다)
+  const forkBWP = [FORK_OUT, { x: 395, y: 232 }, { x: 350, y: 195 }, { x: 305, y: 232 }, FORK_IN];
   // 합류 이후: 좌측을 타고 내려와 출발선으로 복귀 (mainB의 마지막 점은 반드시 P0과 동일해야 루프가 이어짐)
   const mainBWP = [
     FORK_IN, { x: 160, y: 220 }, { x: 100, y: 300 }, { x: 100, y: 420 },
@@ -3483,7 +3485,7 @@ window.Router = {
   let cdStart = 0, cdLabel = "_";
   let rafId = null, lastTs = 0;
 
-  const LAPS_PER_SEC_BASE = 1 / 5.2; // 랩 1개 기준 소요시간(노이즈 적용 전)
+  const LAPS_PER_SEC_BASE = 1 / 6.5; // 랩 1개 기준 소요시간(노이즈 적용 전) — 기존 대비 20% 느리게
   const LANE_MAX = TRACK_HALF_W_NOM * 0.72;
   const COLLIDE_DIST_NOM = 20; // nominal 단위 충돌 판정 거리
   const ITEM_TYPES = ["banana", "fireball", "boost", "bomb", "invincible"];
@@ -3566,39 +3568,48 @@ window.Router = {
   function useItem(kart) {
     const kind = kart.item;
     kart.item = null;
+    const p = posAtScreen(kart.progress, kart.lane, kart.branch);
     if (kind === "fireball") {
       projectiles.push({ owner: kart, progress: kart.progress, lane: kart.lane, life: 3.2 });
       beep(1500, 0.09, "square", 0.045, 500);
+      addFloat(p.x, p.y - 34, "🔥 발사!", "#e23c1f");
     } else if (kind === "boost") {
       kart.boostT = 2.6;
       beep(500, 0.16, "sawtooth", 0.05, 1400);
+      addFloat(p.x, p.y - 34, "🚀 부스트!", "#ff9a3c");
     } else if (kind === "banana") {
       hazards.push({ kind: "banana", progress: kart.progress - 0.006, lane: kart.lane, owner: kart });
       beep(320, 0.08, "triangle", 0.04);
+      addFloat(p.x, p.y - 34, "🍌 투척!", "#c99a1f");
     } else if (kind === "bomb") {
       detonateBomb(kart);
     } else if (kind === "invincible") {
       kart.invincibleT = 3.4;
       beep(1200, 0.05, "sine", 0.04); setTimeout(() => beep(1600, 0.08, "sine", 0.04), 60);
+      addFloat(p.x, p.y - 34, "✨ 무적!", "#0fb3b3");
     }
   }
   function applyEffect(target, kind, fromAngle) {
     if (target.invincibleT > 0) return; // 무적: 모든 공격 무효
     if (target.item === "bomb" && (kind === "fire" || kind === "bomb")) { detonateBomb(target); return; }
-    if (kind === "spin") { target.spinT = 1.1; target.wobble = 1; }
-    else if (kind === "stun" || kind === "bomb" || kind === "fire") { // fire(파이어볼 직격)와 bomb(폭발 반경) 모두 동일한 스턴/넉백
+    const p = posAtScreen(target.progress, target.lane, target.branch);
+    if (kind === "spin") {
+      target.spinT = 1.1; target.wobble = 1;
+      addFloat(p.x, p.y - 34, "😵 스핀!", "#c99a1f");
+    } else if (kind === "stun" || kind === "bomb" || kind === "fire") { // fire(파이어볼 직격)와 bomb(폭발 반경) 모두 동일한 스턴/넉백
       target.stunT = 0.9; target.wobble = 1;
       target.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, target.lane + Math.cos(fromAngle || 0) * rFloat(-6, 6)));
+      addFloat(p.x, p.y - 34, "💫 스턴!", "#e23c1f");
     }
     target.recentHit = 2.5;
-    const p = posAtScreen(target.progress, target.lane, target.branch);
-    addBurst(p.x, p.y, target.color, 6);
+    addBurst(p.x, p.y, target.color, 10);
   }
   function detonateBomb(kart) {
     kart.item = null;
     const p = posAtScreen(kart.progress, kart.lane, kart.branch);
     noiseSfx(0.22, 0.1, 700); beep(90, 0.22, "sine", 0.05, 40);
-    addBurst(p.x, p.y, "#f2a900", 16);
+    addBurst(p.x, p.y, "#f2a900", 24);
+    addFloat(p.x, p.y - 36, "💥 펑!", "#e23c1f");
     for (const o of karts) {
       if (o === kart || o.finished) continue;
       const op = posAtScreen(o.progress, o.lane, o.branch);
@@ -3805,17 +3816,21 @@ window.Router = {
     return t.length ? t + "…" : "";
   }
 
+  // 도로면 색: 본선은 흰색, 분기 두 갈래는 서로 다른 색으로 칠해 "여기서 갈린다"가 지도만 보고도 뚜렷하게 보이게 한다
+  const ROAD_FILL = { mainA: "rgba(255,255,255,.86)", mainB: "rgba(255,255,255,.86)",
+    forkA: "rgba(160,210,255,.9)", forkB: "rgba(255,196,140,.9)" };
+
   function drawTrack() {
     if (!trackPaths) return;
     const roadW = TRACK_HALF_W_NOM * 2 * TR.scale;
     ctx.save();
     ctx.lineJoin = "round"; ctx.lineCap = "round";
-    // 어두운 테두리 먼저, 그 위에 밝은 도로면
+    // 어두운 테두리 먼저, 그 위에 도로면(분기 구간은 갈래별로 색을 다르게)
     for (const key of ["mainA", "forkA", "forkB", "mainB"]) {
       ctx.lineWidth = roadW + 7; ctx.strokeStyle = "#1c2030"; ctx.stroke(trackPaths[key]);
     }
     for (const key of ["mainA", "forkA", "forkB", "mainB"]) {
-      ctx.lineWidth = roadW; ctx.strokeStyle = "rgba(255,255,255,.86)"; ctx.stroke(trackPaths[key]);
+      ctx.lineWidth = roadW; ctx.strokeStyle = ROAD_FILL[key]; ctx.stroke(trackPaths[key]);
     }
     // 중앙 점선
     ctx.setLineDash([10, 12]); ctx.lineWidth = 2; ctx.strokeStyle = "rgba(28,32,48,.22)";
@@ -3842,70 +3857,121 @@ window.Router = {
     ctx.fillText("🏁 START/FINISH", startP.x, startP.y - roadW / 2 - 10);
     ctx.restore();
 
-    // 분기 안내 라벨
+    // 분기/합류 지점 큰 표시
     const forkOutP = posAtScreen(FORK_START, 0, "A");
     const forkInP = posAtScreen(FORK_END, 0, "A");
     ctx.save();
-    ctx.font = "900 11px system-ui,sans-serif"; ctx.fillStyle = "#5b6172"; ctx.textAlign = "center";
-    ctx.fillText("⑂ 분기", forkOutP.x, forkOutP.y - roadW / 2 - 8);
-    ctx.fillText("⑃ 합류", forkInP.x, forkInP.y - roadW / 2 - 8);
+    ctx.font = "900 15px system-ui,sans-serif"; ctx.fillStyle = "#1c2030"; ctx.textAlign = "center";
+    ctx.fillText("⑂ 분기점", forkOutP.x, forkOutP.y - roadW / 2 - 14);
+    ctx.fillText("⑃ 합류점", forkInP.x, forkInP.y - roadW / 2 - 14);
     ctx.restore();
+
+    // 갈래별 성격 라벨: 각 분기 경로의 중간 지점 위에 색이 같은 배지로 표시
+    const mid = FORK_START + (FORK_END - FORK_START) * 0.5;
+    const aMid = posAtScreen(mid, 0, "A"), bMid = posAtScreen(mid, 0, "B");
+    function branchLabel(p, text, color) {
+      ctx.save();
+      ctx.font = "900 12px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const tw = ctx.measureText(text).width, bw = tw + 16, bh = 22;
+      const by = p.y - roadW / 2 - 16;
+      roundRect(p.x - bw / 2, by - bh / 2, bw, bh, 8);
+      ctx.fillStyle = "#fff"; ctx.fill();
+      ctx.lineWidth = 2.4; ctx.strokeStyle = color; ctx.stroke();
+      ctx.fillStyle = color; ctx.fillText(text, p.x, by + 1);
+      ctx.restore();
+    }
+    branchLabel(aMid, "🛣️ 직선 급행 (길다)", "#1f7ae0");
+    branchLabel(bMid, "🌀 숏컷 (짧다)", "#e0791f");
   }
 
+  // 졸라맨이 카트를 모는 탑뷰 실루엣. 진행방향(+x)을 향해 그리며, 사람은 위에서 보이는
+  // 그대로 머리 하나 + 핸들을 잡은 두 팔로 표현한다(몸통은 카트 안에 가려져 top-down에서는
+  // 보이지 않는 게 자연스럽다).
   function drawKartShape(k) {
     const spin = k.spinT > 0 ? Math.sin(raceT * 26) * 0.6 : 0;
     const wobbleRot = k.wobble > 0.02 ? Math.sin(k.wobble * 8) * 0.15 * k.wobble : 0;
     ctx.save();
     ctx.translate(k.sx, k.sy);
     ctx.rotate(k.angle + spin + wobbleRot);
-    const s = Math.max(0.72, Math.min(1.15, TR.scale * 1.15));
+    const s = Math.max(1.05, Math.min(1.75, TR.scale * 1.7)); // 기존 대비 확연히 크게
     ctx.scale(s, s);
 
     if (k.invincibleT > 0) {
-      ctx.save(); ctx.globalAlpha = 0.35 + Math.sin(raceT * 14) * 0.15;
-      ctx.strokeStyle = "#35f0e0"; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.stroke();
+      ctx.save(); ctx.globalAlpha = 0.4 + Math.sin(raceT * 14) * 0.2;
+      ctx.strokeStyle = "#35f0e0"; ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.arc(-2, 0, 25, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-2, 0, 20, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
     if (k.boostT > 0) {
-      ctx.save(); ctx.globalAlpha = 0.7;
-      ctx.fillStyle = "#ff9a3c";
-      ctx.beginPath();
-      ctx.moveTo(-14, -5); ctx.lineTo(-14 - 10 - Math.random() * 8, 0); ctx.lineTo(-14, 5);
-      ctx.closePath(); ctx.fill();
+      ctx.save(); ctx.globalAlpha = 0.8;
+      for (let i = 0; i < 2; i++) {
+        const jitter = rFloat(-3, 3);
+        ctx.fillStyle = i === 0 ? "#ff9a3c" : "#ffd23c";
+        ctx.beginPath();
+        ctx.moveTo(-15, -6 + jitter * 0.3); ctx.lineTo(-15 - 16 - Math.random() * 10, jitter); ctx.lineTo(-15, 6 + jitter * 0.3);
+        ctx.closePath(); ctx.fill();
+      }
       ctx.restore();
     }
 
     ctx.globalAlpha = k.invincibleT > 0 ? 0.75 : 1;
     // 그림자
     ctx.save(); ctx.globalAlpha *= 0.15; ctx.fillStyle = "#1c2030";
-    ctx.beginPath(); ctx.ellipse(1, 2, 15, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.ellipse(0, 11, 18, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 
-    // 바퀴
+    // 바퀴 4개 (탑뷰라 몸체 옆으로 노출)
     ctx.fillStyle = "#1c2030";
-    ctx.fillRect(-13, -10, 6, 5); ctx.fillRect(7, -10, 6, 5);
-    ctx.fillRect(-13, 5, 6, 5); ctx.fillRect(7, 5, 6, 5);
-    // 차체
+    ctx.beginPath(); ctx.arc(-12, -10, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(9, -10, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-12, 10, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(9, 10, 5, 0, Math.PI * 2); ctx.fill();
+
+    // 카트 차체(낮은 좌석) + 앞 코
     ctx.fillStyle = k.color;
-    roundRect(-14, -8, 26, 16, 5); ctx.fill();
-    ctx.lineWidth = 2; ctx.strokeStyle = "#1c2030"; roundRect(-14, -8, 26, 16, 5); ctx.stroke();
-    // 운전자/창
-    ctx.fillStyle = "#fff";
-    ctx.beginPath(); ctx.arc(4, 0, 4.5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = k.color; ctx.lineWidth = 1.5; ctx.stroke();
+    roundRect(-16, -8, 28, 16, 6); ctx.fill();
+    ctx.lineWidth = 2.4; ctx.strokeStyle = "#1c2030"; roundRect(-16, -8, 28, 16, 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(12, -8); ctx.lineTo(21, 0); ctx.lineTo(12, 8); ctx.closePath();
+    ctx.fillStyle = k.color; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = "#1c2030"; ctx.stroke();
+
+    // 졸라맨 운전자: 팔로 핸들 잡기 (탑뷰라 몸통은 카트 안에 가려짐)
+    ctx.strokeStyle = "#1c2030"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-4, -4); ctx.lineTo(10, -4);
+    ctx.moveTo(-4, 4); ctx.lineTo(10, 4);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(11, 0, 4.2, 0, Math.PI * 2); ctx.stroke(); // 핸들
+
+    // 머리 (졸라맨 시그니처: 흰 배경 + 캐릭터 색 테두리)
+    const flash = k.stunT > 0 || k.spinT > 0;
+    ctx.beginPath(); ctx.arc(-3, 0, 9.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff"; ctx.fill();
+    ctx.strokeStyle = flash ? "#ff2d1a" : k.color; ctx.lineWidth = 3.4; ctx.stroke();
+    // 얼굴(전방을 보는 눈)
+    ctx.fillStyle = "#1c2030";
+    ctx.beginPath(); ctx.arc(0.5, -2, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0.5, 2, 1.5, 0, Math.PI * 2); ctx.fill();
+
     ctx.globalAlpha = 1;
     ctx.restore();
 
-    // 이름표
+    // 이름표 + 보유 아이템 아이콘(크게)
     ctx.save();
-    const label = k.name + (k.item ? " " + ITEM_ICON[k.item] : "");
-    ctx.font = "800 11.5px 'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif";
+    const hasItem = !!k.item;
+    const label = k.name;
+    ctx.font = "800 12.5px 'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const tw = ctx.measureText(label).width;
-    const bw = tw + 12, bh = 18, bx = k.sx - bw / 2, by = k.sy - 30;
-    roundRect(bx, by, bw, bh, 6); ctx.fillStyle = "#fff"; ctx.fill();
-    ctx.lineWidth = 1.8; ctx.strokeStyle = k.color; ctx.stroke();
-    ctx.fillStyle = "#1c2030"; ctx.fillText(label, k.sx, by + bh / 2 + 0.5);
+    const iconW = hasItem ? 22 : 0;
+    const bw = tw + 14 + iconW, bh = 20, bx = k.sx - bw / 2, by = k.sy - 40 * (s / 1.4);
+    roundRect(bx, by, bw, bh, 7); ctx.fillStyle = "#fff"; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = k.color; ctx.stroke();
+    ctx.fillStyle = "#1c2030";
+    ctx.fillText(label, bx + 7 + tw / 2, by + bh / 2 + 0.5);
+    if (hasItem) {
+      ctx.font = "16px system-ui,sans-serif";
+      ctx.fillText(ITEM_ICON[k.item], bx + bw - 14, by + bh / 2 + 0.5);
+    }
     ctx.restore();
   }
 
@@ -3929,12 +3995,32 @@ window.Router = {
     drawTrack();
     for (const pk of pickups) drawPickup(pk);
     for (const hz of hazards) {
-      ctx.save(); ctx.font = "18px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText("🍌", hz.sx || 0, hz.sy || 0); ctx.restore();
+      const x = hz.sx || 0, y = hz.sy || 0;
+      ctx.save();
+      // 경고 반경 링(밟으면 걸리는 범위를 시각적으로 알려줌) + 살짝 흔들리는 바나나
+      ctx.globalAlpha = 0.45 + Math.sin(raceT * 5) * 0.15;
+      ctx.strokeStyle = "#f2c200"; ctx.lineWidth = 2; ctx.setLineDash([4, 5]);
+      ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+      ctx.translate(x, y); ctx.rotate(Math.sin(raceT * 3) * 0.3);
+      ctx.font = "28px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("🍌", 0, 0);
+      ctx.restore();
     }
     for (const pr of projectiles) {
-      ctx.save(); ctx.font = "18px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText("🔥", pr.sx || 0, pr.sy || 0); ctx.restore();
+      const x = pr.sx || 0, y = pr.sy || 0;
+      ctx.save();
+      // 이글거리는 후광 + 큰 불덩이
+      const pulse = 1 + Math.sin(raceT * 20) * 0.15;
+      const grad = ctx.createRadialGradient(x, y, 2, x, y, 16 * pulse);
+      grad.addColorStop(0, "rgba(255,230,120,.95)");
+      grad.addColorStop(0.5, "rgba(255,120,40,.75)");
+      grad.addColorStop(1, "rgba(255,60,20,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(x, y, 16 * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.font = "22px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("🔥", x, y);
+      ctx.restore();
     }
     // y좌표 기준 정렬 후 그리기 — 화면 아래쪽 카트가 위쪽 카트를 가리도록
     const order = [...karts].sort((a, b) => a.sy - b.sy);
