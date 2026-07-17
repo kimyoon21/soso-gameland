@@ -3340,7 +3340,7 @@ window.Router = {
   // 호 길이(arc-length) 테이블을 만들어 진행률(0~1)에 따라 등속으로 위치를 뽑는다.
   // 분기 구간은 "픽셀 길이를 맞추는 것"이 아니라 "전체 랩 진행률 예산을 동일하게 배분"하는
   // 방식으로 처리해서, 어느 분기를 타든 진행률 계산이 항상 일관되게 만든다.
-  const NOM_W = 1000, NOM_H = 640;
+  const NOM_W = 1200, NOM_H = 660;
 
   function catmullRom(p0, p1, p2, p3, t) {
     const t2 = t * t, t3 = t2 * t;
@@ -3381,23 +3381,26 @@ window.Router = {
     return { x, y, angle };
   }
 
-  // 웨이포인트(직선 → 우회전 → S자 꼬불 구간 → 분기 진입점)
-  const P0 = { x: 200, y: 560 };
+  // 웨이포인트(직선 → 우측 상행 → 우상단 대형 스윕 → S자 시케인 → 분기 진입점)
+  // 도로 폭이 넓어(TRACK_HALF_W_NOM 참고) 평행 구간은 중심선 간격을 최소 ~150 이상 확보한다.
+  const P0 = { x: 250, y: 575 };
   const mainAWP = [
-    P0, { x: 500, y: 560 }, { x: 760, y: 560 }, { x: 860, y: 500 }, { x: 860, y: 380 },
-    { x: 800, y: 300 }, { x: 700, y: 260 }, { x: 650, y: 320 }, { x: 600, y: 260 },
-    { x: 520, y: 220 }, { x: 450, y: 210 },
+    P0, { x: 580, y: 575 }, { x: 900, y: 575 },              // 바닥 직선
+    { x: 1065, y: 540 }, { x: 1125, y: 430 }, { x: 1125, y: 300 }, // 우측 상행
+    { x: 1065, y: 165 }, { x: 945, y: 105 },                 // 우상단 대형 스윕
+    { x: 830, y: 165 }, { x: 745, y: 295 }, { x: 660, y: 165 },   // S자 시케인
+    { x: 555, y: 230 },
   ];
   const FORK_OUT = mainAWP[mainAWP.length - 1];
-  const FORK_IN = { x: 250, y: 210 };
+  const FORK_IN = { x: 295, y: 230 };
   // 직선 급행로: 완만하게 크게 스윙 (턴각이 작아 "쭉 뻗은" 느낌, 대신 길이는 길다)
-  const forkAWP = [FORK_OUT, { x: 395, y: 30 }, { x: 305, y: 30 }, FORK_IN];
-  // 숏컷: 직선 경로에 바짝 붙은 좁은 지그재그 (턴각이 커 "구불구불"하지만 길이는 짧다)
-  const forkBWP = [FORK_OUT, { x: 395, y: 232 }, { x: 350, y: 195 }, { x: 305, y: 232 }, FORK_IN];
+  const forkAWP = [FORK_OUT, { x: 470, y: 65 }, { x: 375, y: 65 }, FORK_IN];
+  // 숏컷: 아래로 살짝 처지는 완만한 안쪽 커브 (도로 폭이 넓어 지그재그는 뭉개져 보이므로 단일 커브로)
+  const forkBWP = [FORK_OUT, { x: 460, y: 305 }, { x: 390, y: 305 }, FORK_IN];
   // 합류 이후: 좌측을 타고 내려와 출발선으로 복귀 (mainB의 마지막 점은 반드시 P0과 동일해야 루프가 이어짐)
   const mainBWP = [
-    FORK_IN, { x: 160, y: 220 }, { x: 100, y: 300 }, { x: 100, y: 420 },
-    { x: 140, y: 500 }, { x: 200, y: 550 }, { x: 200, y: 560 },
+    FORK_IN, { x: 180, y: 255 }, { x: 108, y: 345 }, { x: 105, y: 460 },
+    { x: 150, y: 545 }, { x: 250, y: 575 },
   ];
 
   const mainALUT = buildLUT(mainAWP, 22);
@@ -3406,7 +3409,6 @@ window.Router = {
   const mainBLUT = buildLUT(mainBWP, 22);
   // 분기 구간의 진행률 예산은 각 구간의 실제 호 길이 비율로 배분한다 (임의 상수 X) —
   // 그래야 mainA/fork/mainB를 지날 때 화면상 속도가 균일하게 유지된다.
-  // (mainA≈1337 / fork평균≈260 / mainB≈497 단위 → 대략 0.638 / 0.124 / 0.238 비율)
   const forkAvgLen = (forkALUT.total + forkBLUT.total) / 2;
   const trackTotalLen = mainALUT.total + forkAvgLen + mainBLUT.total;
   const FORK_START = mainALUT.total / trackTotalLen;
@@ -3425,7 +3427,7 @@ window.Router = {
     return { x: p.x + nx * lane, y: p.y + ny * lane, angle: p.angle };
   }
 
-  const TRACK_HALF_W_NOM = 46; // 트랙 도로 폭(편측, nominal 단위)
+  const TRACK_HALF_W_NOM = 68; // 트랙 도로 폭(편측, nominal 단위)
 
   // ---------- 화면 맞춤 변환 (nominal → screen) ----------
   let TR = { scale: 1, offX: 0, offY: 0 };
@@ -3452,7 +3454,7 @@ window.Router = {
   }
 
   function computeTransform() {
-    const marginTop = 96, marginBot = 34, marginX = 40;
+    const marginTop = 90, marginBot = 22, marginX = 26;
     const availW = Math.max(100, W - marginX * 2), availH = Math.max(100, H - marginTop - marginBot);
     const scale = Math.min(availW / NOM_W, availH / NOM_H);
     TR.scale = scale;
@@ -3817,19 +3819,22 @@ window.Router = {
   }
 
   // 도로면 색: 본선은 흰색, 분기 두 갈래는 서로 다른 색으로 칠해 "여기서 갈린다"가 지도만 보고도 뚜렷하게 보이게 한다
-  const ROAD_FILL = { mainA: "rgba(255,255,255,.86)", mainB: "rgba(255,255,255,.86)",
-    forkA: "rgba(160,210,255,.9)", forkB: "rgba(255,196,140,.9)" };
+  // 불투명 채색: 도로 폭이 넓어 겹침이 많아졌는데, 반투명이면 겹친 자리(라운드 캡, 시케인)가 얼룩져 보인다
+  const ROAD_FILL = { mainA: "#fdfdfd", mainB: "#fdfdfd",
+    forkA: "#a9d4fc", forkB: "#fec896" };
 
   function drawTrack() {
     if (!trackPaths) return;
     const roadW = TRACK_HALF_W_NOM * 2 * TR.scale;
     ctx.save();
     ctx.lineJoin = "round"; ctx.lineCap = "round";
-    // 어두운 테두리 먼저, 그 위에 도로면(분기 구간은 갈래별로 색을 다르게)
-    for (const key of ["mainA", "forkA", "forkB", "mainB"]) {
+    // 어두운 테두리 먼저, 그 위에 도로면(분기 구간은 갈래별로 색을 다르게).
+    // 본선을 먼저 칠하고 분기를 나중에 칠해야 분기점/합류점에서 분기 색이
+    // 본선 위로 자연스럽게 흘러들어간다 (반대 순서면 본선 라운드 캡이 분기 위에 흰 원반으로 뜬다)
+    for (const key of ["mainA", "mainB", "forkA", "forkB"]) {
       ctx.lineWidth = roadW + 7; ctx.strokeStyle = "#1c2030"; ctx.stroke(trackPaths[key]);
     }
-    for (const key of ["mainA", "forkA", "forkB", "mainB"]) {
+    for (const key of ["mainA", "mainB", "forkA", "forkB"]) {
       ctx.lineWidth = roadW; ctx.strokeStyle = ROAD_FILL[key]; ctx.stroke(trackPaths[key]);
     }
     // 중앙 점선
