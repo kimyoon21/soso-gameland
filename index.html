@@ -253,13 +253,14 @@
     gap: var(--cab-gap); width: 100%;
     /* 컨테이너 자체를 "cols장 + 그 사이 gap"만큼만 넓히고 나머지는 카드에 균등 분배 —
        그래야 실제로 한 줄에 정확히 cols개만 들어가고, 남는 줄(5개=3+2)은 가운데로 모인다 */
-    max-width: calc(var(--cab-cols) * 290px + (var(--cab-cols) - 1) * var(--cab-gap));
+    max-width: calc(var(--cab-cols) * 261px + (var(--cab-cols) - 1) * var(--cab-gap));
     padding: 10px 0; flex-wrap: wrap;
   }
   .cab {
     -webkit-appearance: none; appearance: none;
     flex: 0 0 auto;
-    width: clamp(215px, calc((100% - (var(--cab-cols) - 1) * var(--cab-gap)) / var(--cab-cols)), 290px);
+    /* 카드 하나하나 크기를 기존 대비 10% 축소(215~290px → 194~261px) */
+    width: clamp(194px, calc((100% - (var(--cab-cols) - 1) * var(--cab-gap)) / var(--cab-cols)), 261px);
     background: linear-gradient(180deg, #12152b, #0a0c1c);
     border: 2px solid #2a3054; border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
@@ -322,8 +323,8 @@
 
   /* 모바일(좁은 화면)에서는 항상 세로 한 줄로 쌓는다 — 격자 계산 대신 폭 100%로 고정 */
   @media (max-width: 640px) {
-    #cabRow { flex-direction: column; max-width: 380px; }
-    .cab { width: 100%; max-width: 340px; }
+    #cabRow { flex-direction: column; max-width: 342px; }
+    .cab { width: 100%; max-width: 306px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -3288,6 +3289,12 @@ window.Router = {
     78% { opacity: 1; transform: scale(1); }
     100% { opacity: 0; transform: scale(.94); }
   }
+  /* 1등 골인 후 레이스 종료까지 남은 10초 카운트다운(공용 cd-layer 재사용, 캡션만 추가) */
+  .finish-cd { display: flex; flex-direction: column; align-items: center; }
+  .finish-cd .fcd-caption {
+    font-size: clamp(14px, 2.4vw, 22px); font-weight: 800; color: var(--ink-soft);
+    margin-bottom: 2px; letter-spacing: .04em;
+  }
 </style>
 
 <div id="game-kart" class="screen paper" hidden>
@@ -3586,15 +3593,18 @@ window.Router = {
   // ================= 게임 상태 =================
   let state = "idle"; // idle | countdown | racing | done
   let karts = [], projectiles = [], hazards = [], pickups = [], particles = [], confetti = [];
+  let lightningBolts = []; // 번개 아이템의 큰 시각 이펙트(잠깐 표시되는 번개 줄기)
+  let fog = { t: 0, immune: null }; // 안개 아이템: 지속시간 + 안개를 쓴(면역인) 카트
   let raceT = 0, firstFinishT = null, placesGiven = 0, nextPickupT = 0;
+  let postFinishCdLabel = null; // 1등 골인 후 10초 카운트다운 표시용
   let cdStart = 0, cdLabel = "_";
   let rafId = null, lastTs = 0;
 
   const LAPS_PER_SEC_BASE = 1 / 6.5; // 랩 1개 기준 소요시간(노이즈 적용 전) — 기존 대비 20% 느리게
   const LANE_MAX = TRACK_HALF_W_NOM * 0.72;
   const COLLIDE_DIST_NOM = 20; // nominal 단위 충돌 판정 거리
-  const ITEM_TYPES = ["banana", "fireball", "boost", "bomb", "invincible"];
-  const ITEM_ICON = { banana: "🍌", fireball: "🔥", boost: "🚀", bomb: "💣", invincible: "✨" };
+  const ITEM_TYPES = ["banana", "fireball", "boost", "bomb", "invincible", "lightning", "fog"];
+  const ITEM_ICON = { banana: "🍌", fireball: "🔥", boost: "🚀", bomb: "💣", invincible: "✨", lightning: "⚡", fog: "🌫️" };
   const raceProgress = kart => kart.lap + ((kart.progress % 1 + 1) % 1); // 랩 + 이번 랩 진행률(순위 비교용)
 
   function makeKart(name, idx) {
@@ -3603,7 +3613,7 @@ window.Router = {
       progress: rFloat(-0.01, 0.01), lane: rFloat(-LANE_MAX * 0.6, LANE_MAX * 0.6),
       branch: Math.random() < 0.5 ? "A" : "B", forkLap: -1,
       speedNoise: rFloat(0.88, 1.12), lap: 0, finished: false, place: 0,
-      boostT: 0, stunT: 0, spinT: 0, invincibleT: 0, impactT: 0, wobble: 0,
+      boostT: 0, stunT: 0, spinT: 0, invincibleT: 0, impactT: 0, lightningT: 0, wobble: 0,
       driveMult: 1, // 커브/충돌 감속과 직진 가속을 서서히 반영하는 관성 배율(가속도 느낌)
       item: null, itemPickedAt: 0, decisionAt: rFloat(0, 0.6),
       sx: 0, sy: 0, angle: 0, recentHit: 0,
@@ -3622,7 +3632,9 @@ window.Router = {
       k.sx = p.x; k.sy = p.y; k.angle = p.angle;
     }
     projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
+    lightningBolts = []; fog = { t: 0, immune: null };
     raceT = 0; firstFinishT = null; placesGiven = 0; nextPickupT = rFloat(1.5, 3);
+    postFinishCdLabel = null;
     state = "countdown"; cdStart = 0; cdLabel = "_";
     setupEl.style.display = "none";
     controls.hidden = false; hudEl.hidden = false;
@@ -3632,6 +3644,7 @@ window.Router = {
   }
   function backToSetup() {
     state = "idle"; karts = []; projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
+    lightningBolts = []; fog = { t: 0, immune: null };
     controls.hidden = true; hudEl.hidden = true;
     resultEl.classList.remove("show");
     lapPopEl.classList.remove("show");
@@ -3679,6 +3692,26 @@ window.Router = {
     }
     return out;
   }
+  // 현재 순위 1위(완주하지 않은 카트 중 가장 앞선 카트)를 찾는다 — 번개 아이템의 표적
+  function getRaceLeader() {
+    const pool = karts.filter(k => !k.finished);
+    if (!pool.length) return null;
+    return pool.reduce((best, k) => raceProgress(k) > raceProgress(best) ? k : best, pool[0]);
+  }
+  // 번개: 무적이면 완전히 무시하고, 아니면 잠깐 시꺼멓게 되며 스턴 — 큰 번개 줄기 + 화면 플래시 이펙트 동반
+  function strikeLightning(target) {
+    if (target.invincibleT > 0) return;
+    const dur = 1.6;
+    target.stunT = Math.max(target.stunT, dur);
+    target.lightningT = dur; // 스턴과 함께 감소 → 스턴 끝나면 시꺼먼 것도 같이 복구
+    target.wobble = 1; target.recentHit = 2.5;
+    const p = posAtScreen(target.progress, target.lane, target.branch);
+    lightningBolts.push({ x: p.x, y: p.y, life: 0.55 });
+    addFloat(p.x, p.y - 40, "⚡ 감전!", "#ffe14c");
+    addBurst(p.x, p.y, "#fff8c9", 26);
+    noiseSfx(0.26, 0.12, 3200); beep(1700, 0.05, "square", 0.06);
+    setTimeout(() => beep(90, 0.22, "sawtooth", 0.05, 30), 50);
+  }
   function useItem(kart) {
     const kind = kart.item;
     kart.item = null;
@@ -3691,6 +3724,7 @@ window.Router = {
       kart.boostT = 2.6;
       beep(500, 0.16, "sawtooth", 0.05, 1400);
       addFloat(p.x, p.y - 34, "🚀 부스트!", "#ff9a3c");
+      addBurst(p.x, p.y, "#ff9a3c", 14);
     } else if (kind === "banana") {
       hazards.push({ kind: "banana", progress: kart.progress - 0.006, lane: kart.lane, owner: kart });
       beep(320, 0.08, "triangle", 0.04);
@@ -3701,6 +3735,15 @@ window.Router = {
       kart.invincibleT = 3.4;
       beep(1200, 0.05, "sine", 0.04); setTimeout(() => beep(1600, 0.08, "sine", 0.04), 60);
       addFloat(p.x, p.y - 34, "✨ 무적!", "#0fb3b3");
+      addBurst(p.x, p.y, "#35f0e0", 16);
+    } else if (kind === "lightning") {
+      const leader = getRaceLeader();
+      if (leader) strikeLightning(leader);
+    } else if (kind === "fog") {
+      fog.t = 5; fog.immune = kart;
+      beep(220, 0.3, "sine", 0.05);
+      noiseSfx(0.5, 0.18, 260);
+      addFloat(p.x, p.y - 34, "🌫️ 안개!", "#8fa0b8");
     }
   }
   function applyEffect(target, kind, fromAngle) {
@@ -3713,7 +3756,12 @@ window.Router = {
     } else if (kind === "stun" || kind === "bomb" || kind === "fire") { // fire(파이어볼 직격)와 bomb(폭발 반경) 모두 동일한 스턴/넉백
       target.stunT = 0.9; target.wobble = 1;
       target.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, target.lane + Math.cos(fromAngle || 0) * rFloat(-6, 6)));
-      addFloat(p.x, p.y - 34, "💫 스턴!", "#e23c1f");
+      if (kind === "fire") {
+        addFloat(p.x, p.y - 34, "🔥 명중!", "#e23c1f");
+        addBurst(p.x, p.y, "#ff9a3c", 16); // 화염 직격은 더 크고 뜨거운 색으로
+      } else {
+        addFloat(p.x, p.y - 34, "💫 스턴!", "#e23c1f");
+      }
     }
     target.recentHit = 2.5;
     addBurst(p.x, p.y, target.color, 10);
@@ -3722,7 +3770,8 @@ window.Router = {
     kart.item = null;
     const p = posAtScreen(kart.progress, kart.lane, kart.branch);
     noiseSfx(0.22, 0.1, 700); beep(90, 0.22, "sine", 0.05, 40);
-    addBurst(p.x, p.y, "#f2a900", 24);
+    addBurst(p.x, p.y, "#f2a900", 28);
+    particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff7a1f", r0: 8, r1: 78 * TR.scale });
     addFloat(p.x, p.y - 36, "💥 펑!", "#e23c1f");
     for (const o of karts) {
       if (o === kart || o.finished) continue;
@@ -3750,6 +3799,11 @@ window.Router = {
       if (near.some(n => !n.ahead) || held > 5) useItem(kart);
     } else if (kart.item === "invincible") {
       if (near.length || held > 4) useItem(kart);
+    } else if (kart.item === "lightning") {
+      // 이미 자기가 1등이면 자기 자신에게 꽂혀 의미가 없으니 쓰지 않는다
+      if (getRaceLeader() !== kart && held > 1) useItem(kart);
+    } else if (kart.item === "fog") {
+      if (near.length || held > 3) useItem(kart);
     }
   }
 
@@ -3761,6 +3815,10 @@ window.Router = {
     nextPickupT -= ds;
     if (nextPickupT <= 0) { spawnPickup(); nextPickupT = rFloat(1.8, 3.4); }
 
+    if (fog.t > 0) { fog.t -= ds; if (fog.t <= 0) fog.immune = null; }
+    for (const lb of lightningBolts) lb.life -= ds * 1.8;
+    lightningBolts = lightningBolts.filter(lb => lb.life > 0);
+
     for (const kart of karts) {
       if (kart.wobble > 0) kart.wobble -= ds * 1.6;
       if (kart.recentHit > 0) kart.recentHit -= ds;
@@ -3771,12 +3829,15 @@ window.Router = {
       if (kart.spinT > 0) kart.spinT -= ds;
       if (kart.invincibleT > 0) kart.invincibleT -= ds;
       if (kart.impactT > 0) kart.impactT -= ds;
+      if (kart.lightningT > 0) kart.lightningT -= ds; // 스턴과 나란히 감소 → 스턴 끝날 때 시꺼먼 것도 복구
 
       // 아이템 효과(스턴/스핀/부스트)는 기존처럼 즉각 반영되는 이벤트성 배율.
       const eventMult = (kart.stunT > 0 ? 0.16 : 1) * (kart.spinT > 0 ? 0.28 : 1) * (kart.boostT > 0 ? 1.85 : 1);
+      // 안개: 안개를 쓴 카트 본인은 영향 없고, 나머지 전원은 앞이 안 보여 살짝 느려진다
+      const fogSlow = (fog.t > 0 && kart !== fog.immune) ? 0.8 : 1;
       // "주행 감각"(커브 감속 + 충돌 직후 감속 + 직진에서 최고속도로 서서히 가속)은 관성을 둬서
       // 목표치로 서서히 수렴시킨다 — 감속은 빠르게 반응하고, 가속은 완만하게 붙는다.
-      const targetDrive = curveFactorAt(kart.progress, kart.branch) * (kart.impactT > 0 ? 0.62 : 1);
+      const targetDrive = curveFactorAt(kart.progress, kart.branch) * (kart.impactT > 0 ? 0.62 : 1) * fogSlow;
       const rate = targetDrive < kart.driveMult ? 6 : 2.2;
       kart.driveMult += (targetDrive - kart.driveMult) * Math.min(1, rate * ds);
       kart.progress += kart.speedNoise * kart.driveMult * eventMult * LAPS_PER_SEC_BASE * ds;
@@ -3805,6 +3866,13 @@ window.Router = {
 
       const p = posAtScreen(kart.progress, kart.lane, kart.branch);
       kart.sx = p.x; kart.sy = p.y; kart.angle = p.angle;
+
+      if (kart.boostT > 0 && Math.random() < 0.6) { // 부스트 중 뒤로 흩날리는 잔상 트레일
+        const back = kart.angle + Math.PI;
+        particles.push({ type: "dust", x: p.x + Math.cos(back) * 14, y: p.y + Math.sin(back) * 14,
+          vx: Math.cos(back) * rFloat(0.5, 1.4), vy: Math.sin(back) * rFloat(0.5, 1.4), life: 1,
+          color: Math.random() < 0.5 ? "#ff9a3c" : "#ffd23c" });
+      }
     }
 
     // 카트-카트 물리 충돌 — 화면상 실제 거리로 감지한다(분기에서 서로 다른 갈래를 탄 카트는
@@ -3900,17 +3968,29 @@ window.Router = {
 
     for (const p of particles) {
       if (p.type === "txt") { p.y += p.vy; p.life -= 0.014; }
+      else if (p.type === "ring") { p.life -= 0.03; }
       else { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life -= 0.045; }
     }
     particles = particles.filter(p => p.life > 0);
     for (const c of confetti) { c.x += c.vx; c.y += c.vy; c.vy += 0.12; c.rot += c.vr; c.life -= 0.006; }
     confetti = confetti.filter(c => c.life > 0 && c.y < H + 30);
 
-    if (state === "racing" && firstFinishT !== null && raceT - firstFinishT > 12) {
-      // 남은 카트는 실제 진행률(랩+구간진행) 내림차순으로 등수를 매긴다 (배열 순서로 매기면 순위가 왜곡됨)
-      [...karts].filter(k => !k.finished)
-        .sort((a, b) => raceProgress(b) - raceProgress(a))
-        .forEach(k => { k.finished = true; k.place = ++placesGiven; });
+    if (state === "racing" && firstFinishT !== null) {
+      // 1등이 골인한 뒤로는 눈에 보이는 10초 카운트다운을 띄우고, 0이 되면 남은 카트를 강제 완주 처리한다.
+      const remain = 10 - (raceT - firstFinishT);
+      const label = remain > 0 ? String(Math.ceil(remain)) : "";
+      if (label !== postFinishCdLabel) {
+        postFinishCdLabel = label;
+        showFinishCd(label);
+        if (label) beep(Number(label) <= 3 ? 900 : 640, 0.07, "square", 0.045);
+      }
+      if (remain <= 0) {
+        showFinishCd("");
+        // 남은 카트는 실제 진행률(랩+구간진행) 내림차순으로 등수를 매긴다 (배열 순서로 매기면 순위가 왜곡됨)
+        [...karts].filter(k => !k.finished)
+          .sort((a, b) => raceProgress(b) - raceProgress(a))
+          .forEach(k => { k.finished = true; k.place = ++placesGiven; });
+      }
     }
     if (state === "racing" && karts.length && karts.every(k => k.finished)) {
       state = "done";
@@ -4062,6 +4142,26 @@ window.Router = {
       ctx.strokeStyle = "#35f0e0"; ctx.lineWidth = 3.5;
       ctx.beginPath(); ctx.arc(-2, 0, 25, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(-2, 0, 20, 0, Math.PI * 2); ctx.stroke();
+      // 주변을 도는 반짝이는 별들
+      ctx.font = "10px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let i = 0; i < 3; i++) {
+        const a = raceT * 3.2 + (i * Math.PI * 2) / 3;
+        ctx.save(); ctx.globalAlpha = 0.85;
+        ctx.translate(-2 + Math.cos(a) * 24, Math.sin(a) * 24);
+        ctx.fillText("✨", 0, 0);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+    if (k.spinT > 0) {
+      // 어질어질한 별이 머리 위를 빙빙 도는 효과
+      ctx.save(); ctx.font = "11px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let i = 0; i < 3; i++) {
+        const a = raceT * 9 + (i * Math.PI * 2) / 3;
+        ctx.save(); ctx.translate(-3 + Math.cos(a) * 13, -18 + Math.sin(a) * 5);
+        ctx.fillText("💫", 0, 0);
+        ctx.restore();
+      }
       ctx.restore();
     }
     if (k.boostT > 0) {
@@ -4088,12 +4188,24 @@ window.Router = {
     ctx.beginPath(); ctx.arc(-12, 10, 5, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(9, 10, 5, 0, Math.PI * 2); ctx.fill();
 
-    // 카트 차체(낮은 좌석) + 앞 코
-    ctx.fillStyle = k.color;
+    // 카트 차체(낮은 좌석) + 앞 코 — 번개에 맞은 동안은 시꺼멓게 그을린 색으로(스턴 끝나면 원래 색 복구)
+    const bodyColor = k.lightningT > 0 ? "#20202a" : k.color;
+    ctx.fillStyle = bodyColor;
     roundRect(ctx, -16, -8, 28, 16, 6); ctx.fill();
     ctx.lineWidth = 2.4; ctx.strokeStyle = "#1c2030"; roundRect(ctx, -16, -8, 28, 16, 6); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(12, -8); ctx.lineTo(21, 0); ctx.lineTo(12, 8); ctx.closePath();
-    ctx.fillStyle = k.color; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = "#1c2030"; ctx.stroke();
+    ctx.fillStyle = bodyColor; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = "#1c2030"; ctx.stroke();
+    if (k.lightningT > 0) {
+      // 지지직 스파크: 몸체 주변에 짧게 튀는 노란 선
+      ctx.save(); ctx.globalAlpha = 0.6 + Math.sin(raceT * 40) * 0.4;
+      ctx.strokeStyle = "#ffe14c"; ctx.lineWidth = 1.6;
+      for (let i = 0; i < 3; i++) {
+        const a = Math.random() * Math.PI * 2, r1 = 10 + Math.random() * 4, r2 = r1 + 5 + Math.random() * 5;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1); ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // 졸라맨 운전자: 팔로 핸들 잡기 (탑뷰라 몸통은 카트 안에 가려짐)
     ctx.strokeStyle = "#1c2030"; ctx.lineWidth = 3; ctx.lineCap = "round";
@@ -4140,19 +4252,39 @@ window.Router = {
     if (pk.taken) return;
     const p = posAtScreen(pk.progress, pk.lane, "A");
     const s = Math.min(1, pk.popT) * (1 + Math.sin(raceT * 6 + pk.lane) * 0.06);
+    const bob = Math.sin(raceT * 3 + pk.lane) * 2.4; // 살짝 위아래로 둥실
     ctx.save();
-    ctx.translate(p.x, p.y); ctx.scale(s, s);
-    ctx.rotate(Math.sin(raceT * 2 + pk.lane) * 0.14); // 살짝 흔들리는 상자
-    // 물음표 대신 리본 두른 아이템 상자로 표현
-    roundRect(ctx, -13, -13, 26, 26, 6);
-    ctx.fillStyle = "#ffd23c"; ctx.fill();
-    ctx.lineWidth = 2.4; ctx.strokeStyle = "#f2a900"; ctx.stroke();
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(-13, -3, 26, 6); ctx.fillRect(-3, -13, 6, 26); // 십자 리본
-    ctx.lineWidth = 1.6; ctx.strokeStyle = "#f2a900";
-    ctx.strokeRect(-13, -3, 26, 6); ctx.strokeRect(-3, -13, 6, 26);
-    ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, Math.PI * 2); // 리본 매듭
-    ctx.fillStyle = "#fff"; ctx.fill(); ctx.stroke();
+    ctx.translate(p.x, p.y + bob); ctx.scale(s, s);
+
+    // 빛나는 후광
+    const glowR = 20 + Math.sin(raceT * 4 + pk.lane) * 3;
+    const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, glowR);
+    glow.addColorStop(0, "rgba(150,215,255,.55)");
+    glow.addColorStop(1, "rgba(150,215,255,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0, 0, glowR, 0, Math.PI * 2); ctx.fill();
+
+    // 반투명하게 빛나는 정육면체(아이소메트릭 3면), 천천히 좌우로 흔들리며 회전하는 느낌
+    ctx.save();
+    ctx.rotate(Math.sin(raceT * 1.6 + pk.lane) * 0.2);
+    const cs = 11;
+    ctx.globalAlpha = 0.88;
+    ctx.lineWidth = 1.3; ctx.strokeStyle = "rgba(255,255,255,.95)";
+    ctx.beginPath(); // 윗면
+    ctx.moveTo(0, -cs); ctx.lineTo(cs * 0.87, -cs * 0.5); ctx.lineTo(0, 0); ctx.lineTo(-cs * 0.87, -cs * 0.5);
+    ctx.closePath(); ctx.fillStyle = "rgba(220,242,255,.9)"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); // 왼쪽면
+    ctx.moveTo(-cs * 0.87, -cs * 0.5); ctx.lineTo(0, 0); ctx.lineTo(0, cs); ctx.lineTo(-cs * 0.87, cs * 0.5);
+    ctx.closePath(); ctx.fillStyle = "rgba(110,180,255,.5)"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); // 오른쪽면
+    ctx.moveTo(cs * 0.87, -cs * 0.5); ctx.lineTo(0, 0); ctx.lineTo(0, cs); ctx.lineTo(cs * 0.87, cs * 0.5);
+    ctx.closePath(); ctx.fillStyle = "rgba(160,215,255,.68)"; ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // 큐브 안에 둥실 떠 있는 물음표
+    ctx.font = "900 15px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(150,215,255,.95)"; ctx.shadowBlur = 9;
+    ctx.fillStyle = "#fff"; ctx.fillText("?", 0, -1);
     ctx.restore();
   }
 
@@ -4193,12 +4325,18 @@ window.Router = {
     const order = [...karts].sort((a, b) => a.sy - b.sy);
     for (const k of order) drawKartShape(k);
 
+    drawFogOverlay(); // 안개: 트랙/카트는 가리되, 이후 그려지는 파티클(획득/피격 텍스트)은 위에 또렷이 보이게
+
     for (const p of particles) {
       ctx.save(); ctx.globalAlpha = Math.max(0, p.life);
       if (p.type === "txt") {
         ctx.font = "800 13px 'Apple SD Gothic Neo',system-ui,sans-serif"; ctx.textAlign = "center";
         ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.strokeText(p.text, p.x, p.y);
         ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+      } else if (p.type === "ring") { // 폭탄 충격파: 커지면서 옅어지는 원형 링
+        const r = p.r0 + (p.r1 - p.r0) * (1 - p.life);
+        ctx.lineWidth = 4 * p.life + 1; ctx.strokeStyle = p.color || "#f2a900";
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
       } else {
         ctx.fillStyle = p.color || "#aeb8c6";
         ctx.beginPath(); ctx.arc(p.x, p.y, 3 * p.life + 1, 0, Math.PI * 2); ctx.fill();
@@ -4211,7 +4349,51 @@ window.Router = {
       ctx.fillRect(-c.size / 2, -c.size / 2, c.size, c.size * 0.6); ctx.restore();
     }
 
+    drawLightningBolts(); // 번개: 화면 전체 플래시 + 지그재그 번개 줄기, 맨 위에 그려서 확실히 눈에 띄게
+
     if (state === "racing" || state === "done") drawHud();
+  }
+
+  // 안개: 안개를 쓴 카트 주변만 살짝 걷어내서 "이 사람만 잘 보인다"를 표현한다
+  function drawFogOverlay() {
+    if (fog.t <= 0) return;
+    const alpha = Math.min(1, fog.t) * 0.5; // 시작/끝에서 부드럽게 페이드
+    ctx.save();
+    ctx.fillStyle = `rgba(222,228,236,${alpha})`;
+    ctx.fillRect(0, 0, W, H);
+    if (fog.immune) {
+      ctx.globalCompositeOperation = "destination-out";
+      const grad = ctx.createRadialGradient(fog.immune.sx, fog.immune.sy, 0, fog.immune.sx, fog.immune.sy, 95);
+      grad.addColorStop(0, "rgba(0,0,0,1)"); grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(fog.immune.sx, fog.immune.sy, 95, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 번개: 위에서 내리꽂히는 지그재그 줄기 + 정점에서 화면 전체 플래시
+  function drawLightningBolts() {
+    for (const lb of lightningBolts) {
+      const alpha = Math.max(0, Math.min(1, lb.life * 2.2));
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = "#ffe14c"; ctx.shadowBlur = 22;
+      ctx.strokeStyle = "#fff8c9"; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      const steps = 6, topY = Math.max(-20, lb.y - 280);
+      ctx.beginPath(); ctx.moveTo(lb.x, topY);
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const jitter = (1 - t) * 24;
+        ctx.lineTo(lb.x + (Math.random() - 0.5) * jitter, topY + (lb.y - topY) * t + (Math.random() - 0.5) * 8);
+      }
+      ctx.lineTo(lb.x, lb.y);
+      ctx.stroke();
+      ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
+      ctx.restore();
+    }
+    if (lightningBolts.some(lb => lb.life > 0.4)) {
+      ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H); ctx.restore();
+    }
   }
 
   function drawHud() {
@@ -4246,6 +4428,12 @@ window.Router = {
     cdEl.classList.add("show");
     const go = label === "GO!";
     cdEl.innerHTML = `<div class="num anim${go ? " fight" : ""}">${label}</div>`;
+  }
+  // 1등 골인 후 남은 종료 카운트다운 — 같은 cd-layer를 재사용하되 캡션을 붙여 구분한다
+  function showFinishCd(label) {
+    if (!label) { cdEl.classList.remove("show"); cdEl.innerHTML = ""; return; }
+    cdEl.classList.add("show");
+    cdEl.innerHTML = `<div class="finish-cd"><div class="fcd-caption">⏱️ 레이스 종료까지</div><div class="num anim">${label}</div></div>`;
   }
 
   function loopStart() {
