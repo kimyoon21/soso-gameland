@@ -3265,13 +3265,40 @@ window.Router = {
   .kart-hud li { font-weight: 700; margin-bottom: 3px; display: flex; gap: 6px; align-items: center; }
   .kart-hud li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .kart-hud li .lp { color: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+  /* 남은 랩 수 + 1위 이름을 화면 중앙에 크게 짠! 띄웠다가 사라지는 팝업 */
+  .kart-lap-pop {
+    position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; pointer-events: none;
+    opacity: 0; text-align: center;
+  }
+  .kart-lap-pop .lapnum {
+    font-size: clamp(56px, 11vw, 120px); font-weight: 900; color: var(--accent);
+    letter-spacing: -2px; text-shadow: 6px 6px 0 rgba(28,32,48,.16);
+  }
+  .kart-lap-pop .leader {
+    margin-top: 4px; font-size: clamp(20px, 3.4vw, 34px); font-weight: 800; color: var(--ink);
+    text-shadow: 3px 3px 0 rgba(255,255,255,.7);
+  }
+  .kart-lap-pop.show { animation: ktLapPop 2.4s cubic-bezier(.2,1,.3,1) both; }
+  @keyframes ktLapPop {
+    0% { opacity: 0; transform: scale(.5); }
+    14% { opacity: 1; transform: scale(1.12); }
+    22% { transform: scale(1); }
+    78% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(.94); }
+  }
 </style>
 
 <div id="game-kart" class="screen paper" hidden>
   <canvas id="ktCanvas" class="stage"></canvas>
   <div id="ktHud" class="kart-hud" hidden>
-    <h4><span>순위</span><span class="lapn" id="ktLapInfo">10랩 남음</span></h4>
+    <h4><span>순위</span></h4>
     <ol id="ktRankList"></ol>
+  </div>
+  <div id="ktLapPop" class="kart-lap-pop" aria-hidden="true">
+    <div class="lapnum"></div>
+    <div class="leader"></div>
   </div>
 
   <div id="ktControls" class="topctl" hidden>
@@ -3327,7 +3354,9 @@ window.Router = {
   const setupEl = $("ktSetup"), namesEl = $("ktNames"), countEl = $("ktCount");
   const controls = $("ktControls"), cdEl = $("ktCountdown");
   const resultEl = $("ktResult"), resultList = $("ktResultList");
-  const hudEl = $("ktHud"), lapInfoEl = $("ktLapInfo"), rankListEl = $("ktRankList");
+  const hudEl = $("ktHud"), rankListEl = $("ktRankList");
+  const lapPopEl = $("ktLapPop"), lapPopNumEl = lapPopEl.querySelector(".lapnum"), lapPopLeaderEl = lapPopEl.querySelector(".leader");
+  let lastPopLaps = null; // 남은 랩 수가 바뀔 때만(리더가 랩을 돌 때) 팝업을 새로 띄우기 위한 기억값
 
   const PALETTE = [
     "#e23c1f", "#1f7ae0", "#27a85a", "#8b3ff0", "#f2a900",
@@ -3453,11 +3482,30 @@ window.Router = {
     const turnRate = Math.abs(da) / (2 * d);
     return Math.max(0.86, 1 - Math.min(1, turnRate / 40) * 0.14);
   }
+  // 분기점(FORK_START)·합류점(FORK_END)에서는 서로 다른 스플라인으로 넘어가며 접선 각도가
+  // 뚝 끊긴다. 레인(lane) 오프셋이 0이 아닌 카트는 그 각도만큼 오프셋 방향이 즉시 꺾여서
+  // 화면상 옆으로 순간이동한 것처럼 보이므로, 경계 앞뒤 각도를 부드럽게 섞어서 완화한다.
+  const ANGLE_BLEND = 0.008; // 전환 폭(진행률 기준, 경계 앞뒤로 절반씩)
+  function blendedAngleAt(f, branch, rawAngle) {
+    let angle = rawAngle;
+    for (const boundary of [FORK_START, FORK_END]) {
+      const t = (f - (boundary - ANGLE_BLEND)) / (ANGLE_BLEND * 2);
+      if (t < 0 || t > 1) continue;
+      const before = trackSample(boundary - 1e-3, branch).angle;
+      const after = trackSample(boundary + 1e-3, branch).angle;
+      let d = after - before;
+      d = ((d + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+      angle = before + d * (t * t * (3 - 2 * t)); // smoothstep
+    }
+    return angle;
+  }
   // 진행률 + 차선(레인, nominal 단위의 좌우 오프셋) + 분기선택 → nominal 좌표
   function trackPosAt(progress, lane, branch) {
+    const f = ((progress % 1) + 1) % 1;
     const p = trackSample(progress, branch);
-    const nx = -Math.sin(p.angle), ny = Math.cos(p.angle);
-    return { x: p.x + nx * lane, y: p.y + ny * lane, angle: p.angle };
+    const angle = blendedAngleAt(f, branch, p.angle);
+    const nx = -Math.sin(angle), ny = Math.cos(angle);
+    return { x: p.x + nx * lane, y: p.y + ny * lane, angle };
   }
 
   const TRACK_HALF_W_NOM = 68; // 트랙 도로 폭(편측, nominal 단위) — forkA/forkB/mainB 및 mainA의 기준폭
@@ -3567,18 +3615,26 @@ window.Router = {
     if (names.length < 2) return;
     if (window.BGM) BGM.stop();
     karts = names.map(makeKart);
+    // 카운트다운 중엔 update()가 안 돌아서 sx/sy가 초기값(0,0=화면 좌상단)에 머무른다 —
+    // 만들자마자 출발선 위치를 한 번 계산해둬야 카운트다운 때도 출발선에 서 있는 것처럼 보인다.
+    for (const k of karts) {
+      const p = posAtScreen(k.progress, k.lane, k.branch);
+      k.sx = p.x; k.sy = p.y; k.angle = p.angle;
+    }
     projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
     raceT = 0; firstFinishT = null; placesGiven = 0; nextPickupT = rFloat(1.5, 3);
     state = "countdown"; cdStart = 0; cdLabel = "_";
     setupEl.style.display = "none";
     controls.hidden = false; hudEl.hidden = false;
     resultEl.classList.remove("show");
+    lastPopLaps = null; lapPopEl.classList.remove("show");
     if (!rafId) loopStart();
   }
   function backToSetup() {
     state = "idle"; karts = []; projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
     controls.hidden = true; hudEl.hidden = true;
     resultEl.classList.remove("show");
+    lapPopEl.classList.remove("show");
     cdEl.classList.remove("show"); cdEl.innerHTML = "";
     setupEl.style.display = "flex";
     stopLoop();
@@ -3720,7 +3776,7 @@ window.Router = {
       const eventMult = (kart.stunT > 0 ? 0.16 : 1) * (kart.spinT > 0 ? 0.28 : 1) * (kart.boostT > 0 ? 1.85 : 1);
       // "주행 감각"(커브 감속 + 충돌 직후 감속 + 직진에서 최고속도로 서서히 가속)은 관성을 둬서
       // 목표치로 서서히 수렴시킨다 — 감속은 빠르게 반응하고, 가속은 완만하게 붙는다.
-      const targetDrive = curveFactorAt(kart.progress, kart.branch) * (kart.impactT > 0 ? 0.75 : 1);
+      const targetDrive = curveFactorAt(kart.progress, kart.branch) * (kart.impactT > 0 ? 0.62 : 1);
       const rate = targetDrive < kart.driveMult ? 6 : 2.2;
       kart.driveMult += (targetDrive - kart.driveMult) * Math.min(1, rate * ds);
       kart.progress += kart.speedNoise * kart.driveMult * eventMult * LAPS_PER_SEC_BASE * ds;
@@ -3751,32 +3807,37 @@ window.Router = {
       kart.sx = p.x; kart.sy = p.y; kart.angle = p.angle;
     }
 
-    // 카트-카트 물리 충돌 — 진행방향(앞뒤) 성분과 레인(옆) 성분을 나눠 실제 충돌각대로 튕겨나가게 한다.
-    // 앞뒤로 부딪히면 진행률(progress) 축으로, 옆으로 부딪히면 레인(lane) 축으로 서로 밀어내고,
-    // 어느 쪽이든 부딪힌 순간 속도는(impactT) 잠깐만 살짝 줄어든다 — 예전처럼 뻘겋게 굳어 낑기지 않는다.
+    // 카트-카트 물리 충돌 — 화면상 실제 거리로 감지한다(분기에서 서로 다른 갈래를 탄 카트는
+    // 실제로 멀리 떨어져 있으니 자연히 무시됨 — progress/lane만으로 근접을 재면 분기점 부근에서
+    // 서로 다른 갈래인데도 "충돌"로 오판해 카트가 순간이동한 것처럼 튀는 버그가 있었다).
+    // 카트 A의 진행방향 기준 좌표계로 충돌 법선을 분해해서 앞뒤 충돌은 진행률(progress) 축으로,
+    // 옆 충돌은 레인(lane) 축으로 튕겨나가게 하고, 무적 상태는 판정 자체를 건너뛰어 완전히
+    // 뚫고 지나간다(어느 한쪽이 무적이면 서로에게 아무 영향도 주지 않음).
     const active = karts.filter(k => !k.finished);
     for (let i = 0; i < active.length; i++) {
       for (let j = i + 1; j < active.length; j++) {
         const a = active[i], b = active[j];
-        let dProg = ((b.progress - a.progress) % 1 + 1) % 1;
-        if (dProg > 0.5) dProg -= 1; // -0.5~0.5, a→b 방향(양수면 b가 앞)
-        const dLenNom = dProg * trackTotalLen; // a→b, 진행방향 성분(nominal)
-        const dLaneNom = b.lane - a.lane;       // a→b, 레인 성분(nominal)
-        const dist = Math.hypot(dLenNom, dLaneNom);
-        if (dist < COLLIDE_DIST_NOM && dist > 0.01) {
-          const nx = dLenNom / dist, ny = dLaneNom / dist; // 충돌 법선(진행축, 레인축)
-          const overlap = (COLLIDE_DIST_NOM - dist) * 0.5; // 각자 절반씩 밀려남
-          if (a.invincibleT <= 0) {
-            a.progress -= nx * overlap / trackTotalLen;
-            a.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, a.lane - ny * overlap));
-            a.impactT = Math.max(a.impactT, 0.3);
-          }
-          if (b.invincibleT <= 0) {
-            b.progress += nx * overlap / trackTotalLen;
-            b.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, b.lane + ny * overlap));
-            b.impactT = Math.max(b.impactT, 0.3);
-          }
-          sfxThrottle("kt-bump", 90, () => beep(200, 0.05, "square", 0.03));
+        if (a.invincibleT > 0 || b.invincibleT > 0) continue;
+        const dxScreen = b.sx - a.sx, dyScreen = b.sy - a.sy;
+        const distScreen = Math.hypot(dxScreen, dyScreen);
+        const threshold = COLLIDE_DIST_NOM * TR.scale;
+        if (distScreen < threshold && distScreen > 0.5) {
+          const ang = a.angle;
+          const tx = Math.cos(ang), ty = Math.sin(ang); // 진행(접선) 방향
+          const nx = -Math.sin(ang), ny = Math.cos(ang); // 레인(법선) 방향
+          const distNom = distScreen / TR.scale;
+          const ux = (dxScreen * tx + dyScreen * ty) / TR.scale / distNom; // a→b, 진행축 성분(단위벡터)
+          const uy = (dxScreen * nx + dyScreen * ny) / TR.scale / distNom; // a→b, 레인축 성분(단위벡터)
+          // 겹침 해소분에 더해 "튕겨나가는" 추가 충격을 얹어 더 확실한 충돌감을 준다
+          const overlap = (COLLIDE_DIST_NOM - distNom) * 0.5 + COLLIDE_DIST_NOM * 0.35;
+          a.progress -= ux * overlap / trackTotalLen;
+          a.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, a.lane - uy * overlap));
+          a.impactT = Math.max(a.impactT, 0.45); a.wobble = Math.max(a.wobble, 0.5);
+          b.progress += ux * overlap / trackTotalLen;
+          b.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, b.lane + uy * overlap));
+          b.impactT = Math.max(b.impactT, 0.45); b.wobble = Math.max(b.wobble, 0.5);
+          addBurst((a.sx + b.sx) / 2, (a.sy + b.sy) / 2, "#fff", 7);
+          sfxThrottle("kt-bump", 90, () => beep(150, 0.08, "square", 0.045));
         }
       }
     }
@@ -3941,7 +4002,9 @@ window.Router = {
     const dirP = posAtScreen(0.006, 0, "A");
     const ang = Math.atan2(dirP.y - startP.y, dirP.x - startP.x);
     g.save();
-    g.translate(startP.x, startP.y); g.rotate(ang + Math.PI / 2);
+    // rotate(ang)만 줘야 체크무늬의 긴 축(-halfW~halfW)이 레인(도로 폭) 방향으로 눕는다.
+    // (+Math.PI/2를 더하면 긴 축이 진행방향으로 누워버려 결승선이 가로로 그려진다)
+    g.translate(startP.x, startP.y); g.rotate(ang);
     for (let i = -1; i <= 1; i += 2) {
       for (let s = -startHalfW; s < startHalfW; s += 8) {
         g.fillStyle = (Math.floor((s + startHalfW) / 8) % 2 === 0) ? "#1c2030" : "#fff";
@@ -3964,22 +4027,6 @@ window.Router = {
     g.fillText("⑃ 합류점", forkInP.x, forkInP.y - roadW / 2 - 14);
     g.restore();
 
-    // 갈래별 성격 라벨: 각 분기 경로의 중간 지점 위에 색이 같은 배지로 표시
-    const mid = FORK_START + (FORK_END - FORK_START) * 0.5;
-    const aMid = posAtScreen(mid, 0, "A"), bMid = posAtScreen(mid, 0, "B");
-    function branchLabel(p, text, color) {
-      g.save();
-      g.font = "900 12px system-ui,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
-      const tw = g.measureText(text).width, bw = tw + 16, bh = 22;
-      const by = p.y - roadW / 2 - 16;
-      roundRect(g, p.x - bw / 2, by - bh / 2, bw, bh, 8);
-      g.fillStyle = "#fff"; g.fill();
-      g.lineWidth = 2.4; g.strokeStyle = color; g.stroke();
-      g.fillStyle = color; g.fillText(text, p.x, by + 1);
-      g.restore();
-    }
-    branchLabel(aMid, "🛣️ 직선 급행 (길다)", "#1f7ae0");
-    branchLabel(bMid, "🌀 숏컷 (짧다)", "#e0791f");
   }
 
   function renderTrackCache() {
@@ -4095,11 +4142,17 @@ window.Router = {
     const s = Math.min(1, pk.popT) * (1 + Math.sin(raceT * 6 + pk.lane) * 0.06);
     ctx.save();
     ctx.translate(p.x, p.y); ctx.scale(s, s);
-    roundRect(ctx, -13, -13, 26, 26, 7);
-    ctx.fillStyle = "#fff"; ctx.fill();
+    ctx.rotate(Math.sin(raceT * 2 + pk.lane) * 0.14); // 살짝 흔들리는 상자
+    // 물음표 대신 리본 두른 아이템 상자로 표현
+    roundRect(ctx, -13, -13, 26, 26, 6);
+    ctx.fillStyle = "#ffd23c"; ctx.fill();
     ctx.lineWidth = 2.4; ctx.strokeStyle = "#f2a900"; ctx.stroke();
-    ctx.font = "16px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("❓", 0, 1);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(-13, -3, 26, 6); ctx.fillRect(-3, -13, 6, 26); // 십자 리본
+    ctx.lineWidth = 1.6; ctx.strokeStyle = "#f2a900";
+    ctx.strokeRect(-13, -3, 26, 6); ctx.strokeRect(-3, -13, 6, 26);
+    ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, Math.PI * 2); // 리본 매듭
+    ctx.fillStyle = "#fff"; ctx.fill(); ctx.stroke();
     ctx.restore();
   }
 
@@ -4167,10 +4220,20 @@ window.Router = {
       if (a.finished) return -1; if (b.finished) return 1;
       return raceProgress(b) - raceProgress(a);
     });
-    // 1등(가장 랩을 많이 돈 카트) 기준으로 완주까지 남은 랩 수를 보여준다
+    // 1등(가장 랩을 많이 돈 카트) 기준으로 완주까지 남은 랩 수를 계산하고,
+    // 바뀔 때(리더가 한 바퀴 돌 때)만 화면 중앙에 크게 짠! 띄웠다 사라지게 한다
     const leadLapsDone = Math.max(...karts.map(k => k.finished ? TOTAL_LAPS : k.lap));
     const lapsRemain = Math.max(0, TOTAL_LAPS - leadLapsDone);
-    lapInfoEl.textContent = lapsRemain > 0 ? lapsRemain + "랩 남음" : "라스트 랩";
+    if (lapsRemain !== lastPopLaps && ranked.length && !reduceMotion) {
+      lastPopLaps = lapsRemain;
+      lapPopNumEl.textContent = lapsRemain > 0 ? lapsRemain + "랩 남음" : "라스트 랩";
+      lapPopLeaderEl.textContent = "🏆 1위 " + ranked[0].name;
+      lapPopEl.classList.remove("show");
+      void lapPopEl.offsetWidth; // 강제 리플로우로 애니메이션 재시작
+      lapPopEl.classList.add("show");
+    } else {
+      lastPopLaps = lapsRemain;
+    }
     rankListEl.innerHTML = ranked.map((k, i) => {
       const rank = k.finished ? k.place : i + 1;
       return `<li><span style="color:${k.color}">●</span><span class="nm">${escapeHtml(k.name)}</span>` +
