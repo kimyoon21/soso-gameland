@@ -3720,7 +3720,7 @@ window.Router = {
     kart.item = null;
     const p = posAtScreen(kart.progress, kart.lane, kart.branch);
     if (kind === "fireball") {
-      projectiles.push({ owner: kart, progress: kart.progress, lane: kart.lane, life: 3.2 });
+      projectiles.push({ owner: kart, progress: kart.progress, lane: kart.lane, life: 4 }); // 속도 20% 감소분만큼 사거리 유지하려 수명도 늘림
       beep(1500, 0.09, "square", 0.045, 500);
       addFloat(p.x, p.y - 34, "🔥 발사!", "#e23c1f");
     } else if (kind === "boost") {
@@ -3760,8 +3760,11 @@ window.Router = {
       target.stunT = 0.9; target.wobble = 1;
       target.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, target.lane + Math.cos(fromAngle || 0) * rFloat(-6, 6)));
       if (kind === "fire") {
-        addFloat(p.x, p.y - 34, "🔥 명중!", "#e23c1f");
-        addBurst(p.x, p.y, "#ff9a3c", 16); // 화염 직격은 더 크고 뜨거운 색으로
+        // 불덩이가 커진 만큼 명중 시 "펑" 하는 느낌도 더 크게 — 파편 확대 + 충격파 링 + 효과음 강화
+        noiseSfx(0.18, 0.1, 900); beep(140, 0.14, "sawtooth", 0.055, 40);
+        addFloat(p.x, p.y - 38, "🔥 명중!", "#e23c1f");
+        addBurst(p.x, p.y, "#ff9a3c", 30);
+        particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff6a1f", r0: 6, r1: 55 * TR.scale });
       } else {
         addFloat(p.x, p.y - 34, "💫 스턴!", "#e23c1f");
       }
@@ -3836,8 +3839,8 @@ window.Router = {
 
       // 아이템 효과(스턴/스핀/부스트)는 기존처럼 즉각 반영되는 이벤트성 배율.
       const eventMult = (kart.stunT > 0 ? 0.16 : 1) * (kart.spinT > 0 ? 0.28 : 1) * (kart.boostT > 0 ? 1.85 : 1);
-      // 안개: 안개를 쓴 카트 본인은 영향 없고, 나머지 전원은 앞이 안 보여 살짝 느려진다
-      const fogSlow = (fog.t > 0 && kart !== fog.immune) ? 0.8 : 1;
+      // 안개: 안개를 쓴 카트 본인은 영향 없고, 나머지 전원은 앞이 안 보여 느려진다(기존 20%에서 10%p 추가)
+      const fogSlow = (fog.t > 0 && kart !== fog.immune) ? 0.7 : 1;
       // "주행 감각"(커브 감속 + 충돌 직후 감속 + 직진에서 최고속도로 서서히 가속)은 관성을 둬서
       // 목표치로 서서히 수렴시킨다 — 감속은 빠르게 반응하고, 가속은 완만하게 붙는다.
       const targetDrive = curveFactorAt(kart.progress, kart.branch) * (kart.impactT > 0 ? 0.62 : 1) * fogSlow;
@@ -3915,13 +3918,18 @@ window.Router = {
 
     // 투사체(파이어볼) 이동/충돌
     for (const pr of projectiles) {
-      pr.life -= ds; pr.progress += 0.62 * ds; // 카트보다 훨씬 빠르게 전진
+      pr.life -= ds; pr.progress += 0.496 * ds; // 카트보다 훨씬 빠르게 전진(기존 대비 20% 느리게)
       const pp = posAtScreen(pr.progress, pr.lane, pr.owner.branch);
       pr.sx = pp.x; pr.sy = pp.y;
+      if (Math.random() < 0.7) { // 날아가는 동안 뒤로 흩날리는 불티 트레일 — 커진 불덩이 크기에 맞춰 존재감 강화
+        particles.push({ type: "dust", x: pp.x + rFloat(-4, 4), y: pp.y + rFloat(-4, 4),
+          vx: rFloat(-0.3, 0.3), vy: rFloat(-0.3, 0.3), life: 1,
+          color: Math.random() < 0.5 ? "#ff9a3c" : "#ffe14c" });
+      }
       for (const k of karts) {
         if (k === pr.owner || k.finished) continue;
         const kp = posAtScreen(k.progress, k.lane, k.branch);
-        if (Math.hypot(kp.x - pp.x, kp.y - pp.y) < 22 * TR.scale) {
+        if (Math.hypot(kp.x - pp.x, kp.y - pp.y) < 32 * TR.scale) { // 불덩이가 커진 만큼 피격판정도 넓힘
           applyEffect(k, "fire", pp.angle);
           beep(180, 0.1, "sawtooth", 0.05);
           pr.life = -1;
@@ -4043,7 +4051,7 @@ window.Router = {
   // 유지하되 같이 어둡게 낮춰서 "여기서 갈린다"는 구분은 유지한다.
   // 불투명 채색: 도로 폭이 넓어 겹침이 많아졌는데, 반투명이면 겹친 자리(라운드 캡, 시케인)가 얼룩져 보인다
   const ROAD_FILL = { mainA: "#4a4f58", mainB: "#4a4f58",
-    forkA: "#35526e", forkB: "#6e4a28" };
+    forkA: "#5d758b", forkB: "#8b6e53" }; // 기존 대비 20% 덜 어둡게(흰색 쪽으로 20% 보정)
 
   // mainA는 첫 구간(넓게)/분기 전 구간(좁게)로 폭이 달라 통짜 Path2D 하나를 굵게 긋는 방식으로는
   // 표현할 수 없다. LUT 점 사이를 잘게 나눠 구간마다 다른 lineWidth로 그어서 폭 변화를 구현한다.
@@ -4101,17 +4109,6 @@ window.Router = {
     g.font = "900 12px system-ui,sans-serif"; g.fillStyle = "#1c2030"; g.textAlign = "center";
     g.fillText("🏁 START/FINISH", startP.x, startP.y - startHalfW - 10);
     g.restore();
-
-    // 분기/합류 지점 큰 표시 — 분기점은 mainA가 좁아진 지점, 합류점은 mainB(기본 폭) 시작점
-    const forkOutHalfW = mainAHalfWidthAt(1) * TR.scale;
-    const forkOutP = posAtScreen(FORK_START, 0, "A");
-    const forkInP = posAtScreen(FORK_END, 0, "A");
-    g.save();
-    g.font = "900 15px system-ui,sans-serif"; g.fillStyle = "#1c2030"; g.textAlign = "center";
-    g.fillText("⑂ 분기점", forkOutP.x, forkOutP.y - forkOutHalfW - 14);
-    g.fillText("⑃ 합류점", forkInP.x, forkInP.y - roadW / 2 - 14);
-    g.restore();
-
   }
 
   function renderTrackCache() {
@@ -4143,17 +4140,24 @@ window.Router = {
     ctx.scale(s, s);
 
     if (k.invincibleT > 0) {
-      ctx.save(); ctx.globalAlpha = 0.4 + Math.sin(raceT * 14) * 0.2;
-      ctx.strokeStyle = "#35f0e0"; ctx.lineWidth = 3.5;
+      // 슈퍼마리오 별 무적처럼 무지개색으로 빠르게 색이 바뀌는 링 + 궤도 별
+      ctx.save(); ctx.globalAlpha = 0.55 + Math.sin(raceT * 14) * 0.2;
+      const hue1 = (raceT * 340) % 360, hue2 = (raceT * 340 + 60) % 360;
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = `hsl(${hue1},95%,62%)`;
       ctx.beginPath(); ctx.arc(-2, 0, 25, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = `hsl(${hue2},95%,62%)`;
       ctx.beginPath(); ctx.arc(-2, 0, 20, 0, Math.PI * 2); ctx.stroke();
-      // 주변을 도는 반짝이는 별들
+      // 주변을 도는 반짝이는 별들 — 별마다 다른 색으로 무지개처럼
       ctx.font = "10px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       for (let i = 0; i < 3; i++) {
         const a = raceT * 3.2 + (i * Math.PI * 2) / 3;
-        ctx.save(); ctx.globalAlpha = 0.85;
+        const hue = (raceT * 340 + i * 120) % 360;
+        ctx.save(); ctx.globalAlpha = 0.9;
         ctx.translate(-2 + Math.cos(a) * 24, Math.sin(a) * 24);
-        ctx.fillText("✨", 0, 0);
+        ctx.shadowColor = `hsl(${hue},95%,65%)`; ctx.shadowBlur = 6;
+        ctx.fillStyle = `hsl(${hue},95%,65%)`;
+        ctx.fillText("★", 0, 0);
         ctx.restore();
       }
       ctx.restore();
@@ -4193,8 +4197,10 @@ window.Router = {
     ctx.beginPath(); ctx.arc(-12, 10, 5, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(9, 10, 5, 0, Math.PI * 2); ctx.fill();
 
-    // 카트 차체(낮은 좌석) + 앞 코 — 번개에 맞은 동안은 시꺼멓게 그을린 색으로(스턴 끝나면 원래 색 복구)
-    const bodyColor = k.lightningT > 0 ? "#20202a" : k.color;
+    // 카트 차체(낮은 좌석) + 앞 코 — 번개에 맞은 동안은 시꺼멓게, 무적일 땐 마리오 별처럼
+    // 무지개색으로 빠르게 깜빡이는 색으로(둘 다 끝나면 원래 색 복구)
+    const bodyColor = k.lightningT > 0 ? "#20202a"
+      : k.invincibleT > 0 ? `hsl(${(raceT * 480) % 360},90%,58%)` : k.color;
     ctx.fillStyle = bodyColor;
     roundRect(ctx, -16, -8, 28, 16, 6); ctx.fill();
     ctx.lineWidth = 2.4; ctx.strokeStyle = "#1c2030"; roundRect(ctx, -16, -8, 28, 16, 6); ctx.stroke();
@@ -4333,15 +4339,16 @@ window.Router = {
     for (const pr of projectiles) {
       const x = pr.sx || 0, y = pr.sy || 0;
       ctx.save();
-      // 이글거리는 후광 + 큰 불덩이
+      // 이글거리는 후광 + 큰 불덩이 — 기존 대비 훨씬 크게(반지름 16→30 부근)
       const pulse = 1 + Math.sin(raceT * 20) * 0.15;
-      const grad = ctx.createRadialGradient(x, y, 2, x, y, 16 * pulse);
-      grad.addColorStop(0, "rgba(255,230,120,.95)");
-      grad.addColorStop(0.5, "rgba(255,120,40,.75)");
+      const fireR = 30 * pulse;
+      const grad = ctx.createRadialGradient(x, y, 2, x, y, fireR);
+      grad.addColorStop(0, "rgba(255,235,140,.95)");
+      grad.addColorStop(0.45, "rgba(255,120,40,.8)");
       grad.addColorStop(1, "rgba(255,60,20,0)");
       ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(x, y, 16 * pulse, 0, Math.PI * 2); ctx.fill();
-      ctx.font = "22px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.beginPath(); ctx.arc(x, y, fireR, 0, Math.PI * 2); ctx.fill();
+      ctx.font = "40px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText("🔥", x, y);
       ctx.restore();
     }
@@ -4379,18 +4386,29 @@ window.Router = {
   }
 
   // 안개: 안개를 쓴 카트 주변만 살짝 걷어내서 "이 사람만 잘 보인다"를 표현한다
+  // 안개: 화면 전체를 어둡게 덮어 시야를 가리고, 안개를 쓴 카트 주변만 그 어둠에
+  // 구멍을 뚫어(destination-out) 원래 밝기를 되살린 뒤 그 위에 따뜻한 빛까지 더해서
+  // "그 사람만 밝고 나머지는 안개 속" 인상을 준다.
   function drawFogOverlay() {
     if (fog.t <= 0) return;
-    const alpha = Math.min(1, fog.t) * 0.5; // 시작/끝에서 부드럽게 페이드
+    const alpha = Math.min(1, fog.t) * 0.62; // 시작/끝에서 부드럽게 페이드
     ctx.save();
-    ctx.fillStyle = `rgba(222,228,236,${alpha})`;
+    ctx.fillStyle = `rgba(16,18,26,${alpha})`;
     ctx.fillRect(0, 0, W, H);
     if (fog.immune) {
       ctx.globalCompositeOperation = "destination-out";
-      const grad = ctx.createRadialGradient(fog.immune.sx, fog.immune.sy, 0, fog.immune.sx, fog.immune.sy, 95);
-      grad.addColorStop(0, "rgba(0,0,0,1)"); grad.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(fog.immune.sx, fog.immune.sy, 95, 0, Math.PI * 2); ctx.fill();
+      const r = 105;
+      const holeGrad = ctx.createRadialGradient(fog.immune.sx, fog.immune.sy, 0, fog.immune.sx, fog.immune.sy, r);
+      holeGrad.addColorStop(0, "rgba(0,0,0,1)"); holeGrad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = holeGrad;
+      ctx.beginPath(); ctx.arc(fog.immune.sx, fog.immune.sy, r, 0, Math.PI * 2); ctx.fill();
+
+      ctx.globalCompositeOperation = "lighter"; // 되살린 구멍 위에 따뜻한 빛을 얹어 더 밝아 보이게
+      const glowGrad = ctx.createRadialGradient(fog.immune.sx, fog.immune.sy, 0, fog.immune.sx, fog.immune.sy, r * 0.75);
+      glowGrad.addColorStop(0, "rgba(255,250,225,.55)");
+      glowGrad.addColorStop(1, "rgba(255,250,225,0)");
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath(); ctx.arc(fog.immune.sx, fog.immune.sy, r * 0.75, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }
