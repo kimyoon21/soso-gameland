@@ -200,6 +200,7 @@
   .wname { flex: 1; font-weight: 900; font-size: clamp(20px, 5vw, 30px); letter-spacing: -1px; line-height: 1.1; }
   .wrow.gold .wname { font-size: clamp(28px, 7vw, 46px); }
   .wweap { font-size: 13px; color: var(--ink-soft); font-weight: 700; flex: none; }
+  .wtime { font-size: 13px; color: var(--ink-soft); font-weight: 700; flex: none; font-variant-numeric: tabular-nums; }
   .wsub { font-size: 13px; color: var(--ink-soft); font-weight: 700; text-align: left; margin-top: 2px; }
   .winner-actions { display: flex; gap: 10px; margin-top: 18px; justify-content: center; flex-wrap: wrap; }
   .winner-actions button { box-shadow: var(--shadow); }
@@ -3620,7 +3621,7 @@ window.Router = {
       name, color: PALETTE[idx % PALETTE.length],
       progress: rFloat(-0.01, 0.01), lane: rFloat(-LANE_MAX * 0.6, LANE_MAX * 0.6),
       branch: Math.random() < 0.5 ? "A" : "B", forkLap: -1,
-      speedNoise: rFloat(0.88, 1.12), lap: 0, finished: false, place: 0,
+      speedNoise: rFloat(0.88, 1.12), lap: 0, finished: false, place: 0, finishTime: null,
       boostT: 0, stunT: 0, spinT: 0, invincibleT: 0, impactT: 0, lightningT: 0, wobble: 0,
       driveMult: 1, // 커브/충돌 감속과 직진 가속을 서서히 반영하는 관성 배율(가속도 느낌)
       item: null, itemPickedAt: 0, decisionAt: rFloat(0, 0.6),
@@ -3647,7 +3648,9 @@ window.Router = {
     setupEl.style.display = "none";
     controls.hidden = false; hudEl.hidden = false;
     resultEl.classList.remove("show");
-    lastPopLaps = null; lapPopEl.classList.remove("show");
+    // 시작하자마자 뻔한 "10랩 남음"이 뜨지 않도록, 처음 값과 같은 TOTAL_LAPS로 초기화해둔다 —
+    // 그래야 실제로 리더가 첫 바퀴를 돌아 9랩으로 줄어들 때부터 팝업이 뜬다.
+    lastPopLaps = TOTAL_LAPS; lapPopEl.classList.remove("show");
     if (!rafId) loopStart();
   }
   function backToSetup() {
@@ -3777,17 +3780,18 @@ window.Router = {
     target.recentHit = 2.5;
     addBurst(p.x, p.y, target.color, 10);
   }
+  const BOMB_RADIUS_NOM = 115; // 폭탄 폭발 반경(nominal 단위) — 기존 70 대비 훨씬 광역으로 확대
   function detonateBomb(kart) {
     kart.item = null;
     const p = posAtScreen(kart.progress, kart.lane, kart.branch);
-    noiseSfx(0.22, 0.1, 700); beep(90, 0.22, "sine", 0.05, 40);
-    addBurst(p.x, p.y, "#f2a900", 28);
-    particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff7a1f", r0: 8, r1: 78 * TR.scale });
+    noiseSfx(0.28, 0.12, 500); beep(80, 0.26, "sine", 0.055, 30);
+    addBurst(p.x, p.y, "#f2a900", 40); // 광역 폭발이니 파편도 더 많이
+    particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff7a1f", r0: 8, r1: BOMB_RADIUS_NOM * TR.scale });
     addFloat(p.x, p.y - 36, "💥 펑!", "#e23c1f");
     for (const o of karts) {
       if (o === kart || o.finished) continue;
       const op = posAtScreen(o.progress, o.lane, o.branch);
-      if (Math.hypot(op.x - p.x, op.y - p.y) < 70 * TR.scale) applyEffect(o, "bomb", 0);
+      if (Math.hypot(op.x - p.x, op.y - p.y) < BOMB_RADIUS_NOM * TR.scale) applyEffect(o, "bomb", 0);
     }
     applyEffect(kart, "bomb", 0); // 사용자 본인도 폭발 반경 안 — 스스로도 잠깐 스턴
   }
@@ -3864,7 +3868,7 @@ window.Router = {
       if (curLap > kart.lap) {
         kart.lap = curLap;
         if (kart.lap >= TOTAL_LAPS) {
-          kart.finished = true; kart.place = ++placesGiven;
+          kart.finished = true; kart.place = ++placesGiven; kart.finishTime = raceT; // 실제로 결승선을 통과한 기록(강제완주자는 null로 남음)
           if (firstFinishT === null) {
             firstFinishT = raceT;
             beep(880, 0.1); setTimeout(() => beep(1175, 0.12), 110); setTimeout(() => beep(1568, 0.2), 240);
@@ -3992,15 +3996,21 @@ window.Router = {
     confetti = confetti.filter(c => c.life > 0 && c.y < H + 30);
 
     if (state === "racing" && firstFinishT !== null) {
-      // 1등이 골인한 뒤로는 눈에 보이는 10초 카운트다운을 띄우고, 0이 되면 남은 카트를 강제 완주 처리한다.
-      const remain = 10 - (raceT - firstFinishT);
-      const label = remain > 0 ? String(Math.ceil(remain)) : "";
+      // 1등 골인 직후엔 다른 연출(컨페티·팡파레)과 겹쳐 보이지 않도록 1초 조용히 쉬었다가,
+      // 그 다음 9초 카운트다운을 보여준다(합쳐서 총 대기시간은 그대로 10초).
+      const elapsed = raceT - firstFinishT;
+      const PAUSE = 1, COUNT = 9;
+      let label = "";
+      if (elapsed >= PAUSE) {
+        const remain = COUNT - (elapsed - PAUSE);
+        label = remain > 0 ? String(Math.ceil(remain)) : "";
+      }
       if (label !== postFinishCdLabel) {
         postFinishCdLabel = label;
         showFinishCd(label);
         if (label) beep(Number(label) <= 3 ? 900 : 640, 0.07, "square", 0.045);
       }
-      if (remain <= 0) {
+      if (elapsed >= PAUSE + COUNT) {
         showFinishCd("");
         // 남은 카트는 실제 진행률(랩+구간진행) 내림차순으로 등수를 매긴다 (배열 순서로 매기면 순위가 왜곡됨)
         [...karts].filter(k => !k.finished)
@@ -4022,13 +4032,20 @@ window.Router = {
     }
   }
 
+  // 초 단위 레이스 기록을 "M분 SS초"로 표시 (강제완주자는 finishTime이 null이라 호출되지 않음)
+  function formatRaceTime(sec) {
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return `${m}분 ${String(s).padStart(2, "0")}초`;
+  }
   function showResults() {
     if (window.BGM) { BGM.stop(); BGM.start("victory"); BGM.fanfare(); }
     const order = [...karts].sort((a, b) => a.place - b.place);
     resultList.innerHTML = order.map(k => {
       const gold = k.place === 1 ? " gold" : "";
+      const timeBadge = k.finishTime != null ? `<span class="wtime">${formatRaceTime(k.finishTime)}</span>` : "";
       return `<div class="wrow${gold}"><span class="wrank">${k.place}등</span>` +
         `<span class="wname" style="color:${k.color}">${escapeHtml(k.name)}</span>` +
+        timeBadge +
         `<span class="wweap">${k.place === 1 ? "🏆" : k.place === 2 ? "🥈" : k.place === 3 ? "🥉" : ""}</span></div>`;
     }).join("");
     resultEl.classList.add("show");
