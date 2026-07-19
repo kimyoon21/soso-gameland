@@ -264,19 +264,22 @@
     background: linear-gradient(180deg, #12152b, #0a0c1c);
     border: 2px solid #2a3054; border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
-    padding: 0 0 14px; cursor: pointer; text-align: center;
+    padding: 0 0 12px; cursor: pointer; text-align: center;
     font-family: inherit; color: #cdd6f4;
     transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
     position: relative;
   }
+  /* 카드 세로 높이를 기존 대비 10% 축소 — marq/scr/kname/desc/players 각각의
+     세로 여백·글자크기를 함께 줄여서 특정 한 요소만 뭉개지지 않게 한다. 스크린샷
+     캔버스 자체 높이(intrinsic height 속성, HTML 쪽)도 130→117로 같이 낮춘다. */
   .cab .marq {
-    display: block; border-radius: 10px 10px 0 0; padding: 9px 8px 8px;
+    display: block; border-radius: 10px 10px 0 0; padding: 7px 8px 6px;
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-weight: 700; font-size: clamp(12px, 1.3vw, 14px); letter-spacing: .22em; color: #0a0c1c;
+    font-weight: 700; font-size: clamp(11px, 1.3vw, 13px); letter-spacing: .22em; color: #0a0c1c;
     text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .cab .scr {
-    margin: 10px 12px 0; border-radius: 6px; background: #04050c;
+    margin: 9px 12px 0; border-radius: 6px; background: #04050c;
     border: 2px solid #1d2340; overflow: hidden; position: relative;
   }
   .cab .scr canvas { display: block; width: 100%; height: auto; }
@@ -286,13 +289,13 @@
       rgba(0,0,0,0) 0 2px, rgba(0,0,0,.28) 2px 3px);
     pointer-events: none;
   }
-  .cab .kname { display: block; margin-top: 11px; font-weight: 900; font-size: 17px; color: #eef2ff; letter-spacing: -.2px; }
-  .cab .desc { display: block; margin-top: 4px; font-size: 12px; line-height: 1.5; color: #8892bb; padding: 0 14px; min-height: 36px; }
+  .cab .kname { display: block; margin-top: 10px; font-weight: 900; font-size: 15px; color: #eef2ff; letter-spacing: -.2px; }
+  .cab .desc { display: block; margin-top: 4px; font-size: 11px; line-height: 1.4; color: #8892bb; padding: 0 14px; min-height: 32px; }
   .cab .players {
-    display: inline-block; margin-top: 9px;
+    display: inline-block; margin-top: 8px;
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 10.5px; letter-spacing: .22em; color: var(--amber);
-    border: 1px solid rgba(255,201,60,.4); border-radius: 4px; padding: 3px 8px;
+    font-size: 9.5px; letter-spacing: .22em; color: var(--amber);
+    border: 1px solid rgba(255,201,60,.4); border-radius: 4px; padding: 3px 7px;
   }
   .cab .sel-arrow {
     position: absolute; top: 50%; left: -26px; transform: translateY(-50%);
@@ -344,7 +347,7 @@
       <button class="cab sel" data-game="battle" style="--mc:#ff2d78">
         <span class="sel-arrow">▶</span>
         <span class="marq" style="background:linear-gradient(90deg,#ff2d78,#ff7a5c)">BATTLE ROYALE</span>
-        <span class="scr"><canvas data-icon="battle" width="252" height="130"></canvas></span>
+        <span class="scr"><canvas data-icon="battle" width="252" height="114"></canvas></span>
         <span class="kname">⚔️ 배틀로얄</span>
         <span class="desc">무기 든 졸라맨들이 링에서 난투!<br>마지막 생존자·지정 등수를 추첨</span>
         <span class="players">2-30 PLAYERS</span>
@@ -353,7 +356,7 @@
       <button class="cab" data-game="ladder" style="--mc:#35f0e0">
         <span class="sel-arrow">▶</span>
         <span class="marq" style="background:linear-gradient(90deg,#35f0e0,#4c9dff)">GHOST LEG</span>
-        <span class="scr"><canvas data-icon="ladder" width="252" height="130"></canvas></span>
+        <span class="scr"><canvas data-icon="ladder" width="252" height="114"></canvas></span>
         <span class="kname">🪜 사다리타기</span>
         <span class="desc">고전 사다리 + 순간이동 구멍!<br>쏙 빨려서 반대편에 뿅 떨어진다</span>
         <span class="players">2-15 PLAYERS</span>
@@ -362,7 +365,7 @@
       <button class="cab" data-game="relay" style="--mc:#ffc93c">
         <span class="sel-arrow">▶</span>
         <span class="marq" style="background:linear-gradient(90deg,#ffc93c,#8be04c)">RELAY RUN</span>
-        <span class="scr"><canvas data-icon="relay" width="252" height="130"></canvas></span>
+        <span class="scr"><canvas data-icon="relay" width="252" height="114"></canvas></span>
         <span class="kname">🏃 계주 달리기</span>
         <span class="desc">8레인 트랙을 도는 졸라맨 계주!<br>반 바퀴마다 바톤 터치, 막판 역전</span>
         <span class="players">2-24 PLAYERS</span>
@@ -371,7 +374,7 @@
       <button class="cab" data-game="kart" style="--mc:#8b3ff0">
         <span class="sel-arrow">▶</span>
         <span class="marq" style="background:linear-gradient(90deg,#8b3ff0,#ff2d78)">KART DASH</span>
-        <span class="scr"><canvas data-icon="kart" width="252" height="130"></canvas></span>
+        <span class="scr"><canvas data-icon="kart" width="252" height="114"></canvas></span>
         <span class="kname">🏎️ 카트 레이싱</span>
         <span class="desc">분기·합류 트랙을 10바퀴! 아이템 먹고<br>부딪히며 자동으로 펼치는 난전 레이스</span>
         <span class="players">2-16 PLAYERS</span>
