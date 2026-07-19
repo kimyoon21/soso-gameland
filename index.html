@@ -377,7 +377,7 @@
         <span class="marq" style="background:linear-gradient(90deg,#8b3ff0,#ff2d78)">KART DASH</span>
         <span class="scr"><canvas data-icon="kart" width="252" height="114"></canvas></span>
         <span class="kname">🏎️ 카트 레이싱</span>
-        <span class="desc">분기·합류 트랙을 10바퀴! 아이템 먹고<br>부딪히며 자동으로 펼치는 난전 레이스</span>
+        <span class="desc">분기·합류 트랙을 8바퀴! 아이템 먹고<br>부딪히며 자동으로 펼치는 난전 레이스</span>
         <span class="players">2-16 PLAYERS</span>
       </button>
     </div>
@@ -3274,6 +3274,7 @@ window.Router = {
   .kart-hud li { font-weight: 700; margin-bottom: 3px; display: flex; gap: 6px; align-items: center; }
   .kart-hud li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .kart-hud li .lp { color: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .kart-hud li .lapown { color: var(--accent-deep); font-size: 10.5px; font-weight: 800; flex: none; font-variant-numeric: tabular-nums; }
 
   /* 남은 랩 수 + 1위 이름을 화면 중앙에 크게 짠! 띄웠다가 사라지는 팝업 */
   .kart-lap-pop {
@@ -3330,7 +3331,7 @@ window.Router = {
       <h1 class="title">졸라 <span class="pop">카트 레이싱</span></h1>
       <p class="subtitle">
         이름을 한 줄에 하나씩. 직선·꼬불꼬불한 커브·<b>갈라졌다 합쳐지는 분기 구간</b>이 있는
-        트랙을 <b>10바퀴</b> 돌아 순위를 가립니다. 레인 구분 없이 전원이 자유롭게 경쟁하며
+        트랙을 <b>8바퀴</b> 돌아 순위를 가립니다. 레인 구분 없이 전원이 자유롭게 경쟁하며
         서로 부딪히고, 트랙에 뿅 나타나는 <b>아이템</b>(🍌🔥🚀💣✨)을 주워 알아서 사용합니다.
       </p>
 
@@ -3379,7 +3380,7 @@ window.Router = {
     "#e0408f", "#0fb3b3", "#7a5230", "#3b4cca", "#5a8f00",
     "#c0407a", "#0a8fa0",
   ];
-  const TOTAL_LAPS = 10;
+  const TOTAL_LAPS = 8;
   const rFloat = (a, b) => a + Math.random() * (b - a);
   const rInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -3622,7 +3623,7 @@ window.Router = {
       progress: rFloat(-0.01, 0.01), lane: rFloat(-LANE_MAX * 0.6, LANE_MAX * 0.6),
       branch: Math.random() < 0.5 ? "A" : "B", forkLap: -1,
       speedNoise: rFloat(0.88, 1.12), lap: 0, finished: false, place: 0, finishTime: null,
-      boostT: 0, stunT: 0, spinT: 0, invincibleT: 0, impactT: 0, lightningT: 0, wobble: 0,
+      boostT: 0, stunT: 0, spinT: 0, invincibleT: 0, impactT: 0, lightningT: 0, burnT: 0, wobble: 0,
       driveMult: 1, // 커브/충돌 감속과 직진 가속을 서서히 반영하는 관성 배율(가속도 느낌)
       item: null, itemPickedAt: 0, decisionAt: rFloat(0, 0.6),
       sx: 0, sy: 0, angle: 0, recentHit: 0,
@@ -3648,8 +3649,8 @@ window.Router = {
     setupEl.style.display = "none";
     controls.hidden = false; hudEl.hidden = false;
     resultEl.classList.remove("show");
-    // 시작하자마자 뻔한 "10랩 남음"이 뜨지 않도록, 처음 값과 같은 TOTAL_LAPS로 초기화해둔다 —
-    // 그래야 실제로 리더가 첫 바퀴를 돌아 9랩으로 줄어들 때부터 팝업이 뜬다.
+    // 시작하자마자 뻔한 "N랩 남음"(총 랩수 그대로)이 뜨지 않도록, 처음 값과 같은 TOTAL_LAPS로 초기화해둔다 —
+    // 그래야 실제로 리더가 첫 바퀴를 돌아 랩수가 줄어들 때부터 팝업이 뜬다.
     lastPopLaps = TOTAL_LAPS; lapPopEl.classList.remove("show");
     if (!rafId) loopStart();
   }
@@ -3741,7 +3742,10 @@ window.Router = {
       beep(320, 0.08, "triangle", 0.04);
       addFloat(p.x, p.y - 34, "🍌 투척!", "#c99a1f");
     } else if (kind === "bomb") {
-      detonateBomb(kart);
+      // 쓰자마자 터지지 않고, 그 자리에 큰 폭탄을 내려놓은 뒤 3초 후에 폭발한다(hazards에서 관리)
+      hazards.push({ kind: "bomb", progress: kart.progress, lane: kart.lane, branch: kart.branch, owner: kart, armT: 3 });
+      beep(90, 0.16, "sine", 0.05, 55);
+      addFloat(p.x, p.y - 34, "💣 설치!", "#e23c1f");
     } else if (kind === "invincible") {
       kart.invincibleT = 3.4;
       beep(1200, 0.05, "sine", 0.04); setTimeout(() => beep(1600, 0.08, "sine", 0.04), 60);
@@ -3759,7 +3763,12 @@ window.Router = {
   }
   function applyEffect(target, kind, fromAngle) {
     if (target.invincibleT > 0) return; // 무적: 모든 공격 무효
-    if (target.item === "bomb" && (kind === "fire" || kind === "bomb")) { detonateBomb(target); return; }
+    // 보유 중인 미사용 폭탄이 외부 충격(화염/다른 폭발)을 맞으면 그 자리에서 즉시 연쇄 폭발한다
+    if (target.item === "bomb" && (kind === "fire" || kind === "bomb")) {
+      target.item = null;
+      detonateBombAt(posAtScreen(target.progress, target.lane, target.branch), target);
+      return;
+    }
     const p = posAtScreen(target.progress, target.lane, target.branch);
     if (kind === "spin") {
       target.spinT = 1.1; target.wobble = 1;
@@ -3768,11 +3777,13 @@ window.Router = {
       target.stunT = 0.9; target.wobble = 1;
       target.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, target.lane + Math.cos(fromAngle || 0) * rFloat(-6, 6)));
       if (kind === "fire") {
-        // 불덩이가 커진 만큼 명중 시 "펑" 하는 느낌도 더 크게 — 파편 확대 + 충격파 링 + 효과음 강화
-        noiseSfx(0.18, 0.1, 900); beep(140, 0.14, "sawtooth", 0.055, 40);
-        addFloat(p.x, p.y - 38, "🔥 명중!", "#e23c1f");
-        addBurst(p.x, p.y, "#ff9a3c", 30);
-        particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff6a1f", r0: 6, r1: 55 * TR.scale });
+        // 불덩이가 커진 만큼 명중 시 "펑" 하는 느낌도 훨씬 크게 — 파편/충격파 확대 + 효과음 강화 + 잠시 그을려서 까맣게
+        noiseSfx(0.22, 0.13, 850); beep(130, 0.16, "sawtooth", 0.06, 35);
+        setTimeout(() => beep(85, 0.18, "sawtooth", 0.05, 25), 45);
+        addFloat(p.x, p.y - 40, "🔥 명중!", "#e23c1f");
+        addBurst(p.x, p.y, "#ff9a3c", 42);
+        particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff6a1f", r0: 6, r1: 75 * TR.scale });
+        target.burnT = 1.1; // 스턴과 함께 사라짐 — 화상으로 잠시 까맣게 그을린 색이 됨
       } else {
         addFloat(p.x, p.y - 34, "💫 스턴!", "#e23c1f");
       }
@@ -3780,20 +3791,20 @@ window.Router = {
     target.recentHit = 2.5;
     addBurst(p.x, p.y, target.color, 10);
   }
-  const BOMB_RADIUS_NOM = 115; // 폭탄 폭발 반경(nominal 단위) — 기존 70 대비 훨씬 광역으로 확대
-  function detonateBomb(kart) {
-    kart.item = null;
-    const p = posAtScreen(kart.progress, kart.lane, kart.branch);
-    noiseSfx(0.28, 0.12, 500); beep(80, 0.26, "sine", 0.055, 30);
-    addBurst(p.x, p.y, "#f2a900", 40); // 광역 폭발이니 파편도 더 많이
-    particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff7a1f", r0: 8, r1: BOMB_RADIUS_NOM * TR.scale });
-    addFloat(p.x, p.y - 36, "💥 펑!", "#e23c1f");
+  const BOMB_RADIUS_NOM = 150; // 폭탄 폭발 반경(nominal 단위) — 광역 요청으로 확대
+  // 폭탄은 이제 "쓰자마자 즉시 터지는" 게 아니라, 그 자리에 내려놓고 3초 뒤에 쾅 터진다(hazards에서 처리).
+  // 이 함수는 실제 폭발 순간에만 호출된다 — 화면좌표(p)를 직접 받아서, 설치 당시 위치에서 터지게 한다
+  // (호출 시점엔 놓은 사람이 이미 다른 곳으로 이동해 있을 수 있으므로 kart 위치를 다시 읽지 않는다).
+  function detonateBombAt(p, owner) {
+    noiseSfx(0.32, 0.16, 400); beep(70, 0.32, "sine", 0.06, 22);
+    addBurst(p.x, p.y, "#f2a900", 46); // 광역 폭발이니 파편도 더 많이
+    particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff7a1f", r0: 10, r1: BOMB_RADIUS_NOM * TR.scale });
+    addFloat(p.x, p.y - 40, "💥 쾅!", "#e23c1f");
     for (const o of karts) {
-      if (o === kart || o.finished) continue;
+      if (o.finished) continue;
       const op = posAtScreen(o.progress, o.lane, o.branch);
       if (Math.hypot(op.x - p.x, op.y - p.y) < BOMB_RADIUS_NOM * TR.scale) applyEffect(o, "bomb", 0);
     }
-    applyEffect(kart, "bomb", 0); // 사용자 본인도 폭발 반경 안 — 스스로도 잠깐 스턴
   }
 
   function decideItemUse(kart, dt) {
@@ -3845,6 +3856,7 @@ window.Router = {
       if (kart.invincibleT > 0) kart.invincibleT -= ds;
       if (kart.impactT > 0) kart.impactT -= ds;
       if (kart.lightningT > 0) kart.lightningT -= ds; // 스턴과 나란히 감소 → 스턴 끝날 때 시꺼먼 것도 복구
+      if (kart.burnT > 0) kart.burnT -= ds; // 화염 직격 그을림도 마찬가지로 잠시 후 복구
 
       // 아이템 효과(스턴/스핀/부스트)는 기존처럼 즉각 반영되는 이벤트성 배율.
       const eventMult = (kart.stunT > 0 ? 0.16 : 1) * (kart.spinT > 0 ? 0.28 : 1) * (kart.boostT > 0 ? 1.85 : 1);
@@ -3929,7 +3941,7 @@ window.Router = {
     for (const pr of projectiles) {
       pr.life -= ds; pr.progress += 0.496 * ds; // 카트보다 훨씬 빠르게 전진(기존 대비 20% 느리게)
       const pp = posAtScreen(pr.progress, pr.lane, pr.owner.branch);
-      pr.sx = pp.x; pr.sy = pp.y;
+      pr.sx = pp.x; pr.sy = pp.y; pr.angle = pp.angle; // 진행 반대방향으로 불꽃을 흩날리려면 각도가 필요
       if (Math.random() < 0.7) { // 날아가는 동안 뒤로 흩날리는 불티 트레일 — 커진 불덩이 크기에 맞춰 존재감 강화
         particles.push({ type: "dust", x: pp.x + rFloat(-4, 4), y: pp.y + rFloat(-4, 4),
           vx: rFloat(-0.3, 0.3), vy: rFloat(-0.3, 0.3), life: 1,
@@ -3948,11 +3960,19 @@ window.Router = {
     }
     projectiles = projectiles.filter(pr => pr.life > 0);
 
-    // 바나나(장애물) — 지나가는 카트가 밟으면 스핀
+    // 장애물 처리: 바나나(지나가는 카트가 밟으면 스핀) + 폭탄(설치 후 3초 뒤 그 자리에서 쾅 폭발)
     for (const hz of hazards) {
       if (hz.hit) continue;
-      const hp = posAtScreen(hz.progress, hz.lane, hz.owner.branch);
+      const hp = posAtScreen(hz.progress, hz.lane, hz.branch || hz.owner.branch);
       hz.sx = hp.x; hz.sy = hp.y;
+      if (hz.kind === "bomb") {
+        hz.armT -= ds;
+        if (hz.armT <= 0) {
+          detonateBombAt(hp, hz.owner);
+          hz.hit = true;
+        }
+        continue;
+      }
       for (const k of karts) {
         if (k === hz.owner || k.finished) continue;
         const kp = posAtScreen(k.progress, k.lane, k.branch);
@@ -4219,9 +4239,10 @@ window.Router = {
     ctx.beginPath(); ctx.arc(-12, 10, 5, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(9, 10, 5, 0, Math.PI * 2); ctx.fill();
 
-    // 카트 차체(낮은 좌석) + 앞 코 — 번개에 맞은 동안은 시꺼멓게, 무적일 땐 마리오 별처럼
-    // 무지개색으로 빠르게 깜빡이는 색으로(둘 다 끝나면 원래 색 복구)
+    // 카트 차체(낮은 좌석) + 앞 코 — 번개에 맞으면 새까맣게, 화염에 맞으면 그을린 색으로,
+    // 무적일 땐 마리오 별처럼 무지개색으로 빠르게 깜빡이는 색으로(모두 끝나면 원래 색 복구)
     const bodyColor = k.lightningT > 0 ? "#20202a"
+      : k.burnT > 0 ? "#2b2320"
       : k.invincibleT > 0 ? `hsl(${(raceT * 480) % 360},90%,58%)` : k.color;
     ctx.fillStyle = bodyColor;
     roundRect(ctx, -16, -8, 28, 16, 6); ctx.fill();
@@ -4348,22 +4369,56 @@ window.Router = {
     for (const hz of hazards) {
       const x = hz.sx || 0, y = hz.sy || 0;
       ctx.save();
-      // 경고 반경 링(밟으면 걸리는 범위를 시각적으로 알려줌) + 살짝 흔들리는 바나나
-      ctx.globalAlpha = 0.45 + Math.sin(raceT * 5) * 0.15;
-      ctx.strokeStyle = "#f2c200"; ctx.lineWidth = 2; ctx.setLineDash([4, 5]);
-      ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]); ctx.globalAlpha = 1;
-      ctx.translate(x, y); ctx.rotate(Math.sin(raceT * 3) * 0.3);
-      ctx.font = "28px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText("🍌", 0, 0);
+      if (hz.kind === "bomb") {
+        // 터지기까지 남은 시간이 줄어들수록 경고 반경 링이 더 빨리, 더 붉게 깜빡인다
+        const urgency = 1 - Math.max(0, Math.min(1, hz.armT / 3));
+        const blinkHz = 3 + urgency * 9;
+        ctx.globalAlpha = 0.4 + Math.sin(raceT * blinkHz) * 0.2;
+        ctx.strokeStyle = urgency > 0.6 ? "#ff2d1a" : "#f2a900";
+        ctx.lineWidth = 2.5; ctx.setLineDash([7, 7]);
+        ctx.beginPath(); ctx.arc(x, y, BOMB_RADIUS_NOM * TR.scale, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+        ctx.translate(x, y); ctx.rotate(Math.sin(raceT * blinkHz) * 0.08);
+        ctx.font = "36px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("💣", 0, 0);
+        const secLeft = Math.max(0, Math.ceil(hz.armT));
+        ctx.font = "900 14px system-ui,sans-serif"; ctx.lineWidth = 3.4; ctx.strokeStyle = "#1c2030";
+        ctx.strokeText(String(secLeft), 0, -28);
+        ctx.fillStyle = "#fff"; ctx.fillText(String(secLeft), 0, -28);
+      } else {
+        // 경고 반경 링(밟으면 걸리는 범위를 시각적으로 알려줌) + 살짝 흔들리는 바나나
+        ctx.globalAlpha = 0.45 + Math.sin(raceT * 5) * 0.15;
+        ctx.strokeStyle = "#f2c200"; ctx.lineWidth = 2; ctx.setLineDash([4, 5]);
+        ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+        ctx.translate(x, y); ctx.rotate(Math.sin(raceT * 3) * 0.3);
+        ctx.font = "28px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("🍌", 0, 0);
+      }
       ctx.restore();
     }
     for (const pr of projectiles) {
       const x = pr.sx || 0, y = pr.sy || 0;
-      ctx.save();
-      // 이글거리는 후광 + 큰 불덩이 — 기존 대비 훨씬 크게(반지름 16→30 부근)
       const pulse = 1 + Math.sin(raceT * 20) * 0.15;
       const fireR = 30 * pulse;
+      // 관성 때문에 불꽃은 진행 반대방향으로 이글거리며 늘어져야 자연스럽다 — 진행각의 반대로
+      // 회전시킨 좌표계에서 뒤로 길쭉한 타원 그라디언트를 먼저 깔고, 그 위에 중심 불덩이를 얹는다.
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate((pr.angle || 0) + Math.PI);
+      const trailLen = fireR * 2.2;
+      const trailGrad = ctx.createLinearGradient(0, 0, trailLen, 0);
+      trailGrad.addColorStop(0, "rgba(255,200,90,.8)");
+      trailGrad.addColorStop(0.55, "rgba(255,110,40,.4)");
+      trailGrad.addColorStop(1, "rgba(255,60,20,0)");
+      ctx.fillStyle = trailGrad;
+      ctx.beginPath();
+      ctx.ellipse(trailLen * 0.52, 0, trailLen * 0.52, fireR * 0.48, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      // 이글거리는 후광 + 큰 불덩이 — 기존 대비 훨씬 크게(반지름 16→30 부근)
       const grad = ctx.createRadialGradient(x, y, 2, x, y, fireR);
       grad.addColorStop(0, "rgba(255,235,140,.95)");
       grad.addColorStop(0.45, "rgba(255,120,40,.8)");
@@ -4482,7 +4537,10 @@ window.Router = {
     }
     rankListEl.innerHTML = ranked.map((k, i) => {
       const rank = k.finished ? k.place : i + 1;
+      // 완주하지 않은 사람만 "본인 기준" 남은 랩 수를 함께 보여준다(완주자는 이미 0바퀴 남음이라 생략)
+      const lapBadge = k.finished ? "" : `<span class="lapown">${Math.max(0, TOTAL_LAPS - k.lap)}랩</span>`;
       return `<li><span style="color:${k.color}">●</span><span class="nm">${escapeHtml(k.name)}</span>` +
+        lapBadge +
         `<span class="lp">${k.finished ? rank + "등" : rank + "위"}</span></li>`;
     }).join("");
   }
