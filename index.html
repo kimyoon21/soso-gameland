@@ -3482,6 +3482,9 @@ window.Router = {
   const trackTotalLen = mainALUT.total + forkAvgLen + mainBLUT.total;
   const FORK_START = mainALUT.total / trackTotalLen;
   const FORK_END = FORK_START + forkAvgLen / trackTotalLen;
+  // 파이어볼 직선 이동 속도(nominal 단위/초) — 예전 레일 추종 속도(트랙 한 바퀴를 0.496배속으로 도는 것과
+  // 같은 체감 속도)를 그대로 물려받아, 직선으로 바뀌어도 "카트보다 훨씬 빠르다"는 느낌은 유지한다.
+  const FIREBALL_SPEED_NOM = trackTotalLen * 0.496;
 
   function trackSample(progress, branch) {
     let f = ((progress % 1) + 1) % 1;
@@ -3542,6 +3545,21 @@ window.Router = {
     const s = t * t * (3 - 2 * t); // smoothstep
     return MAINA_HALFW_START + (MAINA_HALFW_PREFORK - MAINA_HALFW_START) * s;
   }
+
+  // 파이어볼이 트랙 벽(도로 경계)에 완전탄성 충돌로 튕기게 하려면, "가장 가까운 트랙 중심선 점 +
+  // 그 지점의 반폭"을 빠르게 조회할 수 있어야 한다. mainA/forkA/forkB/mainB의 LUT 점을 한 번만
+  // 합쳐서 캐시해둔다(4갈래가 공간적으로 겹치지 않으므로 branch 구분 없이 최근접 탐색만으로 충분하다).
+  const trackWallPts = (() => {
+    const pts = [];
+    for (let i = 0; i < mainALUT.pts.length; i++) {
+      const p = mainALUT.pts[i];
+      pts.push({ x: p.x, y: p.y, halfW: mainAHalfWidthAt(mainALUT.cum[i] / mainALUT.total) });
+    }
+    for (const lut of [forkALUT, forkBLUT, mainBLUT]) {
+      for (const p of lut.pts) pts.push({ x: p.x, y: p.y, halfW: TRACK_HALF_W_NOM });
+    }
+    return pts;
+  })();
 
   // ---------- 화면 맞춤 변환 (nominal → screen) ----------
   let TR = { scale: 1, offX: 0, offY: 0 };
@@ -3729,7 +3747,15 @@ window.Router = {
     kart.item = null;
     const p = posAtScreen(kart.progress, kart.lane, kart.branch);
     if (kind === "fireball") {
-      projectiles.push({ owner: kart, progress: kart.progress, lane: kart.lane, life: 4 }); // 속도 20% 감소분만큼 사거리 유지하려 수명도 늘림
+      // 트랙 레일을 따라가지 않고, 발사 순간의 진행 방향으로 직진하는 자유 투사체.
+      // 벽(트랙 경계)에 부딪히면 완전탄성으로 계속 튕기다가, 카트를 맞히면 터지고
+      // 아무도 못 맞히면 수명이 다했을 때 그냥 사라진다.
+      const launch = trackPosAt(kart.progress, kart.lane, kart.branch); // nominal 좌표+각도
+      projectiles.push({
+        owner: kart, x: launch.x, y: launch.y,
+        vx: Math.cos(launch.angle) * FIREBALL_SPEED_NOM, vy: Math.sin(launch.angle) * FIREBALL_SPEED_NOM,
+        angle: launch.angle, life: 5,
+      });
       beep(1500, 0.09, "square", 0.045, 500);
       addFloat(p.x, p.y - 34, "🔥 발사!", "#e23c1f");
     } else if (kind === "boost") {
@@ -3742,8 +3768,9 @@ window.Router = {
       beep(320, 0.08, "triangle", 0.04);
       addFloat(p.x, p.y - 34, "🍌 투척!", "#c99a1f");
     } else if (kind === "bomb") {
-      // 쓰자마자 터지지 않고, 그 자리에 큰 폭탄을 내려놓은 뒤 3초 후에 폭발한다(hazards에서 관리)
-      hazards.push({ kind: "bomb", progress: kart.progress, lane: kart.lane, branch: kart.branch, owner: kart, armT: 3 });
+      // 쓰자마자 터지지 않고, 그 자리에 큰 폭탄을 내려놓은 뒤 2.5초 후에 폭발한다(hazards에서 관리) —
+      // Math.ceil로 표시하므로 2.5→2.0까지 0.5초 만에 "3"에서 "2"로 훅 줄어드는 긴장감을 준다
+      hazards.push({ kind: "bomb", progress: kart.progress, lane: kart.lane, branch: kart.branch, owner: kart, armT: 2.5 });
       beep(90, 0.16, "sine", 0.05, 55);
       addFloat(p.x, p.y - 34, "💣 설치!", "#e23c1f");
     } else if (kind === "invincible") {
@@ -3949,11 +3976,36 @@ window.Router = {
       }
     }
 
-    // 투사체(파이어볼) 이동/충돌
+    // 투사체(파이어볼) 이동/충돌 — 레일을 따라가지 않고 직선으로 날아가다 트랙 벽에 완전탄성으로 튕긴다
     for (const pr of projectiles) {
-      pr.life -= ds; pr.progress += 0.496 * ds; // 카트보다 훨씬 빠르게 전진(기존 대비 20% 느리게)
-      const pp = posAtScreen(pr.progress, pr.lane, pr.owner.branch);
-      pr.sx = pp.x; pr.sy = pp.y; pr.angle = pp.angle; // 진행 반대방향으로 불꽃을 흩날리려면 각도가 필요
+      pr.life -= ds;
+      pr.x += pr.vx * ds; pr.y += pr.vy * ds; // nominal 공간에서 순수 직선 운동
+
+      // 가장 가까운 트랙 중심선 점을 찾아, 그 지점의 반폭(halfW)을 넘어섰으면 벽에 닿은 것으로 보고
+      // 벽 바깥쪽(중심선→현재위치) 방향을 법선 삼아 속도를 반사한다 — 속력은 그대로 유지되는 완전탄성 충돌.
+      let nearest = null, nearestDist = Infinity;
+      for (const wp of trackWallPts) {
+        const d = (pr.x - wp.x) * (pr.x - wp.x) + (pr.y - wp.y) * (pr.y - wp.y);
+        if (d < nearestDist) { nearestDist = d; nearest = wp; }
+      }
+      nearestDist = Math.sqrt(nearestDist);
+      if (nearest && nearestDist > nearest.halfW) {
+        const nx = (pr.x - nearest.x) / nearestDist, ny = (pr.y - nearest.y) / nearestDist;
+        const dot = pr.vx * nx + pr.vy * ny;
+        if (dot > 0) {
+          pr.vx -= 2 * dot * nx; pr.vy -= 2 * dot * ny;
+          pr.angle = Math.atan2(pr.vy, pr.vx);
+          const bp = toScreen(pr.x, pr.y);
+          addBurst(bp.x, bp.y, "#ffcf4d", 6); // 튕기는 순간 스파크
+          sfxThrottle("kt-firewall", 70, () => beep(500, 0.05, "square", 0.03));
+        }
+        // 경계 바로 안쪽으로 밀어넣어 벽에 박혀 매 프레임 반사되는 것을 방지
+        pr.x = nearest.x + nx * nearest.halfW * 0.96;
+        pr.y = nearest.y + ny * nearest.halfW * 0.96;
+      }
+
+      const pp = toScreen(pr.x, pr.y);
+      pr.sx = pp.x; pr.sy = pp.y;
       if (Math.random() < 0.7) { // 날아가는 동안 뒤로 흩날리는 불티 트레일 — 커진 불덩이 크기에 맞춰 존재감 강화
         particles.push({ type: "dust", x: pp.x + rFloat(-4, 4), y: pp.y + rFloat(-4, 4),
           vx: rFloat(-0.3, 0.3), vy: rFloat(-0.3, 0.3), life: 1,
@@ -3963,7 +4015,7 @@ window.Router = {
         if (k === pr.owner || k.finished) continue;
         const kp = posAtScreen(k.progress, k.lane, k.branch);
         if (Math.hypot(kp.x - pp.x, kp.y - pp.y) < 32 * TR.scale) { // 불덩이가 커진 만큼 피격판정도 넓힘
-          applyEffect(k, "fire", pp.angle);
+          applyEffect(k, "fire", pr.angle);
           beep(180, 0.1, "sawtooth", 0.05);
           pr.life = -1;
           break;
@@ -4384,7 +4436,7 @@ window.Router = {
       ctx.save();
       if (hz.kind === "bomb") {
         // 터지기까지 남은 시간이 줄어들수록 경고 반경 링이 더 빨리, 더 붉게 깜빡인다
-        const urgency = 1 - Math.max(0, Math.min(1, hz.armT / 3));
+        const urgency = 1 - Math.max(0, Math.min(1, hz.armT / 2.5));
         const blinkHz = 3 + urgency * 9;
         ctx.globalAlpha = 0.4 + Math.sin(raceT * blinkHz) * 0.2;
         ctx.strokeStyle = urgency > 0.6 ? "#ff2d1a" : "#f2a900";
