@@ -3768,11 +3768,17 @@ window.Router = {
       beep(320, 0.08, "triangle", 0.04);
       addFloat(p.x, p.y - 34, "🍌 투척!", "#c99a1f");
     } else if (kind === "bomb") {
-      // 쓰자마자 터지지 않고, 그 자리에 큰 폭탄을 내려놓은 뒤 2.5초 후에 폭발한다(hazards에서 관리) —
-      // Math.ceil로 표시하므로 2.5→2.0까지 0.5초 만에 "3"에서 "2"로 훅 줄어드는 긴장감을 준다
-      hazards.push({ kind: "bomb", progress: kart.progress, lane: kart.lane, branch: kart.branch, owner: kart, armT: 2.5 });
-      beep(90, 0.16, "sine", 0.05, 55);
-      addFloat(p.x, p.y - 34, "💣 설치!", "#e23c1f");
+      // 그 자리에 두고 카운트다운하는 대신, 하늘로 슝 던져서 트랙 위 완전히 랜덤한 지점에
+      // 떨어져 쾅 터진다 — 날아가는 동안 점점 커졌다 착지 직전 다시 작아지는 포물선 연출(hazards에서 관리)
+      const startNom = trackPosAt(kart.progress, kart.lane, kart.branch);
+      const landBranch = Math.random() < 0.5 ? "A" : "B";
+      const landNom = trackPosAt(Math.random(), rFloat(-LANE_MAX, LANE_MAX), landBranch);
+      hazards.push({
+        kind: "bombfall", owner: kart, t: 0, dur: 0.9,
+        x0: startNom.x, y0: startNom.y, x1: landNom.x, y1: landNom.y,
+      });
+      beep(500, 0.35, "sine", 0.05, 1900); // 슝~ 하고 하늘로 던지는 상승 휘파람 소리
+      addFloat(p.x, p.y - 34, "💣 투척!", "#e23c1f");
     } else if (kind === "invincible") {
       kart.invincibleT = 3.4;
       beep(1200, 0.05, "sine", 0.04); setTimeout(() => beep(1600, 0.08, "sine", 0.04), 60);
@@ -4024,19 +4030,25 @@ window.Router = {
     }
     projectiles = projectiles.filter(pr => pr.life > 0);
 
-    // 장애물 처리: 바나나(지나가는 카트가 밟으면 스핀) + 폭탄(설치 후 3초 뒤 그 자리에서 쾅 폭발)
+    // 장애물 처리: 바나나(지나가는 카트가 밟으면 스핀) + 폭탄(하늘로 던져져 포물선을 그리다 랜덤 지점에 착지해 쾅 폭발)
     for (const hz of hazards) {
       if (hz.hit) continue;
-      const hp = posAtScreen(hz.progress, hz.lane, hz.branch || hz.owner.branch);
-      hz.sx = hp.x; hz.sy = hp.y;
-      if (hz.kind === "bomb") {
-        hz.armT -= ds;
-        if (hz.armT <= 0) {
-          detonateBombAt(hp, hz.owner);
+      if (hz.kind === "bombfall") {
+        hz.t += ds;
+        const frac = Math.min(1, hz.t / hz.dur);
+        const curX = hz.x0 + (hz.x1 - hz.x0) * frac;
+        const curY = hz.y0 + (hz.y1 - hz.y0) * frac;
+        hz.heightFrac = Math.sin(Math.PI * frac); // 0→1→0, 포물선 높이(시각효과용)
+        const sp = toScreen(curX, curY);
+        hz.sx = sp.x; hz.sy = sp.y;
+        if (frac >= 1) {
+          detonateBombAt(sp, hz.owner);
           hz.hit = true;
         }
         continue;
       }
+      const hp = posAtScreen(hz.progress, hz.lane, hz.branch || hz.owner.branch);
+      hz.sx = hp.x; hz.sy = hp.y;
       for (const k of karts) {
         if (k === hz.owner || k.finished) continue;
         const kp = posAtScreen(k.progress, k.lane, k.branch);
@@ -4434,22 +4446,20 @@ window.Router = {
     for (const hz of hazards) {
       const x = hz.sx || 0, y = hz.sy || 0;
       ctx.save();
-      if (hz.kind === "bomb") {
-        // 터지기까지 남은 시간이 줄어들수록 경고 반경 링이 더 빨리, 더 붉게 깜빡인다
-        const urgency = 1 - Math.max(0, Math.min(1, hz.armT / 2.5));
-        const blinkHz = 3 + urgency * 9;
-        ctx.globalAlpha = 0.4 + Math.sin(raceT * blinkHz) * 0.2;
-        ctx.strokeStyle = urgency > 0.6 ? "#ff2d1a" : "#f2a900";
-        ctx.lineWidth = 2.5; ctx.setLineDash([7, 7]);
-        ctx.beginPath(); ctx.arc(x, y, BOMB_RADIUS_NOM * TR.scale, 0, Math.PI * 2); ctx.stroke();
-        ctx.setLineDash([]); ctx.globalAlpha = 1;
-        ctx.translate(x, y); ctx.rotate(Math.sin(raceT * blinkHz) * 0.08);
-        ctx.font = "36px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      if (hz.kind === "bombfall") {
+        // 카운트다운 대신 포물선으로 던져지는 연출: 뜬 높이(heightFrac)가 커질수록 확대되고
+        // 화면상 위로 떠오르며, 바닥에는 착지 예상 지점을 알려주는 그림자가 옅게 남는다.
+        const hf = hz.heightFrac || 0;
+        const scale = 1 + hf * 1.5;
+        const liftPx = hf * 80 * TR.scale;
+        ctx.save(); // 그림자용 fillStyle 변경이 아래 이모지 렌더링에 새어들지 않도록 범위를 분리
+        ctx.globalAlpha = 0.3 * (1 - hf * 0.6);
+        ctx.fillStyle = "#000";
+        ctx.beginPath(); ctx.ellipse(x, y, 16 * (1 - hf * 0.4), 7 * (1 - hf * 0.4), 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.translate(x, y - liftPx); ctx.scale(scale, scale); ctx.rotate(raceT * 9);
+        ctx.font = "34px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText("💣", 0, 0);
-        const secLeft = Math.max(0, Math.ceil(hz.armT));
-        ctx.font = "900 14px system-ui,sans-serif"; ctx.lineWidth = 3.4; ctx.strokeStyle = "#1c2030";
-        ctx.strokeText(String(secLeft), 0, -28);
-        ctx.fillStyle = "#fff"; ctx.fillText(String(secLeft), 0, -28);
       } else {
         // 경고 반경 링(밟으면 걸리는 범위를 시각적으로 알려줌) + 살짝 흔들리는 바나나
         ctx.globalAlpha = 0.45 + Math.sin(raceT * 5) * 0.15;
