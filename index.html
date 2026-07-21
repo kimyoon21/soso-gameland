@@ -3822,6 +3822,7 @@ window.Router = {
         target.burnT = stunDur; // 스턴과 함께 사라짐 — 화상으로 잠시 까맣게 그을린 색이 됨
       } else {
         addFloat(p.x, p.y - 34, "💫 스턴!", "#e23c1f");
+        if (kind === "bomb") target.burnT = stunDur; // 폭탄에 맞아도 스턴 동안 잠시 까맣게 그을린다(번개/화염과 동일)
       }
     }
     target.recentHit = 2.5;
