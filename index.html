@@ -3903,6 +3903,12 @@ window.Router = {
       if (kart.impactT > 0) kart.impactT -= ds;
       if (kart.lightningT > 0) kart.lightningT -= ds; // 스턴과 나란히 감소 → 스턴 끝날 때 시꺼먼 것도 복구
       if (kart.burnT > 0) kart.burnT -= ds; // 화염 직격 그을림도 마찬가지로 잠시 후 복구
+      if ((kart.lightningT > 0 || kart.burnT > 0) && Math.random() < 0.5) {
+        // 몸체 색만 바꾸면 화면상 작은 카트에서는 잘 안 보이므로, 위로 피어오르는 그을음 연기를 더해
+        // "지금 이 카트가 타고 있다"는 게 멀리서도 눈에 띄게 한다.
+        particles.push({ type: "dust", x: kart.sx + rFloat(-6, 6), y: kart.sy - 6,
+          vx: rFloat(-0.2, 0.2), vy: rFloat(-1.1, -0.7), life: 1, color: "#5a5550" });
+      }
 
       // 아이템 효과(스턴/스핀/부스트)는 기존처럼 즉각 반영되는 이벤트성 배율.
       const eventMult = (kart.stunT > 0 ? 0.16 : 1) * (kart.spinT > 0 ? 0.28 : 1) * (kart.boostT > 0 ? 1.85 : 1);
@@ -4347,13 +4353,15 @@ window.Router = {
     ctx.stroke();
     ctx.beginPath(); ctx.arc(11, 0, 4.2, 0, Math.PI * 2); ctx.stroke(); // 핸들
 
-    // 머리 (졸라맨 시그니처: 흰 배경 + 캐릭터 색 테두리)
+    // 머리 (졸라맨 시그니처: 흰 배경 + 캐릭터 색 테두리) — 그을린 동안은 몸통뿐 아니라
+    // 가장 눈에 잘 띄는 흰 머리까지 그을린 색으로 덮어야 "까맣게 탔다"가 실제로 눈에 들어온다
     const flash = k.stunT > 0 || k.spinT > 0;
+    const burning = k.lightningT > 0 || k.burnT > 0;
     ctx.beginPath(); ctx.arc(-3, 0, 9.5, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff"; ctx.fill();
+    ctx.fillStyle = burning ? bodyColor : "#fff"; ctx.fill();
     ctx.strokeStyle = flash ? "#ff2d1a" : k.color; ctx.lineWidth = 3.4; ctx.stroke();
-    // 얼굴(전방을 보는 눈)
-    ctx.fillStyle = "#1c2030";
+    // 얼굴(전방을 보는 눈) — 머리가 그을려 어두워진 동안엔 눈도 밝은 색으로 바꿔야 다크온다크로 묻히지 않는다
+    ctx.fillStyle = burning ? "#ffd23c" : "#1c2030";
     ctx.beginPath(); ctx.arc(0.5, -2, 1.5, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(0.5, 2, 1.5, 0, Math.PI * 2); ctx.fill();
 
@@ -4596,6 +4604,12 @@ window.Router = {
     }
     if (lightningBolts.some(lb => lb.life > 0.4)) {
       ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H); ctx.restore();
+    }
+    // 번개가 친 직후엔 밝은 플래시에 이어 아주 잠깐 화면이 어두워졌다 돌아온다(정전되는 듯한 느낌, 안개와 비슷한 어둠)
+    const afterFlash = lightningBolts.find(lb => lb.life <= 0.4);
+    if (afterFlash) {
+      const darkAlpha = (afterFlash.life / 0.4) * 0.4;
+      ctx.save(); ctx.globalAlpha = darkAlpha; ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H); ctx.restore();
     }
   }
 
