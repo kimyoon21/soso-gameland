@@ -185,11 +185,11 @@
   @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
   .winner-card {
     background: #fff; border: 2.5px solid var(--ink); border-radius: 16px;
-    box-shadow: 8px 8px 0 var(--ink); padding: 30px 40px; text-align: center;
-    transform: rotate(-1.2deg); max-width: 90vw; max-height: 86vh; overflow-y: auto;
+    box-shadow: 8px 8px 0 var(--ink); padding: 24px 40px; text-align: center;
+    transform: rotate(-1.2deg); max-width: 90vw; max-height: 96vh; overflow-y: auto;
   }
   .winner-eyebrow { font-size: 13px; font-weight: 800; letter-spacing: .25em; text-transform: uppercase; color: var(--ink-soft); }
-  .wlist { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 6px; min-width: min(320px, 78vw); }
+  .wlist { display: flex; flex-direction: column; gap: 7px; margin: 14px 0 6px; min-width: min(320px, 78vw); }
   .wrow { display: flex; align-items: center; gap: 12px; text-align: left; }
   .wrank {
     font-weight: 900; font-size: 13px; color: #fff; background: var(--ink);
@@ -4148,10 +4148,11 @@ window.Router = {
     }
   }
 
-  // 초 단위 레이스 기록을 "M분 SS초"로 표시 (강제완주자는 finishTime이 null이라 호출되지 않음)
+  // 초 단위 레이스 기록을 "M분 SS.xx초"로 표시(소수 둘째 자리까지) — 강제완주자는 finishTime이
+  // null이라 호출되지 않음
   function formatRaceTime(sec) {
-    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
-    return `${m}분 ${String(s).padStart(2, "0")}초`;
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return `${m}분 ${s.toFixed(2).padStart(5, "0")}초`;
   }
   function showResults() {
     if (window.BGM) { BGM.stop(); BGM.start("victory"); BGM.fanfare(); }
