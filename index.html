@@ -3622,6 +3622,7 @@ window.Router = {
   let state = "idle"; // idle | countdown | racing | done
   let karts = [], projectiles = [], hazards = [], pickups = [], particles = [], confetti = [];
   let lightningBolts = []; // 번개 아이템의 큰 시각 이펙트(잠깐 표시되는 번개 줄기)
+  let lightningCasts = []; // 번개 예고(사용 즉시 화면이 어두워지고, 0.5초 뒤에 실제로 내리꽂힘)
   let fog = { t: 0, immune: null }; // 안개 아이템: 지속시간 + 안개를 쓴(면역인) 카트
   let raceT = 0, firstFinishT = null, placesGiven = 0, nextPickupT = 0;
   let postFinishCdLabel = null; // 1등 골인 후 10초 카운트다운 표시용
@@ -3660,7 +3661,7 @@ window.Router = {
       k.sx = p.x; k.sy = p.y; k.angle = p.angle;
     }
     projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
-    lightningBolts = []; fog = { t: 0, immune: null };
+    lightningBolts = []; lightningCasts = []; fog = { t: 0, immune: null };
     raceT = 0; firstFinishT = null; placesGiven = 0; nextPickupT = rFloat(1.5, 3);
     postFinishCdLabel = null;
     state = "countdown"; cdStart = 0; cdLabel = "_";
@@ -3674,7 +3675,7 @@ window.Router = {
   }
   function backToSetup() {
     state = "idle"; karts = []; projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
-    lightningBolts = []; fog = { t: 0, immune: null };
+    lightningBolts = []; lightningCasts = []; fog = { t: 0, immune: null };
     controls.hidden = true; hudEl.hidden = true;
     resultEl.classList.remove("show");
     lapPopEl.classList.remove("show");
@@ -3785,8 +3786,13 @@ window.Router = {
       addFloat(p.x, p.y - 34, "✨ 무적!", "#0fb3b3");
       addBurst(p.x, p.y, "#35f0e0", 16);
     } else if (kind === "lightning") {
+      // 쓰자마자 바로 꽂히는 게 아니라: 사용 즉시 화면이 어두워지기 시작하고(폭풍 전야 느낌),
+      // 0.5초 뒤에 실제 번개가 내리꽂힌다. 표적(1위)은 쓰는 시점에 고정한다.
       const leader = getRaceLeader();
-      if (leader) strikeLightning(leader);
+      if (leader) {
+        lightningCasts.push({ target: leader, armT: 0.5 });
+        noiseSfx(0.5, 0.14, 220); // 낮게 우르릉거리는 전조 소리
+      }
     } else if (kind === "fog") {
       fog.t = 5; fog.immune = kart;
       beep(220, 0.3, "sine", 0.05);
@@ -3890,6 +3896,12 @@ window.Router = {
     if (fog.t > 0) { fog.t -= ds; if (fog.t <= 0) fog.immune = null; }
     for (const lb of lightningBolts) lb.life -= ds * 1.8;
     lightningBolts = lightningBolts.filter(lb => lb.life > 0);
+    // 번개 예고 — 화면은 이미 어두워지는 중이고, 0.5초가 다 되면 그제서야 실제로 내리꽂힌다
+    for (const lc of lightningCasts) {
+      lc.armT -= ds;
+      if (lc.armT <= 0) { strikeLightning(lc.target); lc.hit = true; }
+    }
+    lightningCasts = lightningCasts.filter(lc => !lc.hit);
 
     for (const kart of karts) {
       if (kart.wobble > 0) kart.wobble -= ds * 1.6;
@@ -4357,9 +4369,12 @@ window.Router = {
     // 가장 눈에 잘 띄는 흰 머리까지 그을린 색으로 덮어야 "까맣게 탔다"가 실제로 눈에 들어온다
     const flash = k.stunT > 0 || k.spinT > 0;
     const burning = k.lightningT > 0 || k.burnT > 0;
+    // 스턴/스핀 표시는 빨간색으로 고정하지 않는다 — 원래 색이 빨강인 캐릭터(예: 브라운)와
+    // 헷갈리므로, 대신 흰색/호박색이 번갈아 깜빡이는 스트로브로 표현해 캐릭터 색과 무관하게 항상 구분되게 한다.
     ctx.beginPath(); ctx.arc(-3, 0, 9.5, 0, Math.PI * 2);
     ctx.fillStyle = burning ? bodyColor : "#fff"; ctx.fill();
-    ctx.strokeStyle = flash ? "#ff2d1a" : k.color; ctx.lineWidth = 3.4; ctx.stroke();
+    ctx.strokeStyle = flash ? (Math.floor(raceT * 14) % 2 === 0 ? "#fff" : "#ffcf4d") : k.color;
+    ctx.lineWidth = flash ? 4.2 : 3.4; ctx.stroke();
     // 얼굴(전방을 보는 눈) — 머리가 그을려 어두워진 동안엔 눈도 밝은 색으로 바꿔야 다크온다크로 묻히지 않는다
     ctx.fillStyle = burning ? "#ffd23c" : "#1c2030";
     ctx.beginPath(); ctx.arc(0.5, -2, 1.5, 0, Math.PI * 2); ctx.fill();
@@ -4584,6 +4599,12 @@ window.Router = {
 
   // 번개: 위에서 내리꽂히는 지그재그 줄기 + 정점에서 화면 전체 플래시
   function drawLightningBolts() {
+    // 번개 예고: 사용하는 순간부터(0.5초 전조) 화면이 즉시 어두워져 폭풍 전야 같은 긴장감을 준다 —
+    // 실제로 내리꽂히는 순간(플래시)까지 계속 유지된다.
+    if (lightningCasts.length) {
+      const darkAlpha = 0.46 + Math.sin(raceT * 11) * 0.07;
+      ctx.save(); ctx.globalAlpha = darkAlpha; ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H); ctx.restore();
+    }
     for (const lb of lightningBolts) {
       const alpha = Math.max(0, Math.min(1, lb.life * 2.2));
       ctx.save();
