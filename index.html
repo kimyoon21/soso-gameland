@@ -3654,6 +3654,31 @@ window.Router = {
     if (names.length < 2) return;
     if (window.BGM) BGM.stop();
     karts = names.map(makeKart);
+    // 출발 대열: 다들 좁게 뭉쳐서 출발하면 그 자리에서 바로 부딪히므로, 여러 열(가로)×여러 줄(세로)의
+    // 격자로 넓게 퍼뜨려 세운다. 격자 슬롯은 무작위로 섞어 배정해 이름 순서대로 정렬된 것처럼 보이지
+    // 않게 하고, 슬롯 안에서도 살짝 지터를 줘 딱딱해 보이지 않게 한다.
+    // 폭은 출발 직선 자체의 확장폭(MAINA_HALFW_START)이 아니라 LANE_MAX를 기준으로 잡는다 —
+    // 카트는 스스로 조향하지 않으므로(반응형 레인 변경만 있음), 출발 직선을 벗어나 도로가 다시
+    // 좁아지면 LANE_MAX보다 바깥에 있던 카트는 그대로 도로 밖으로 벗어나 보이게 된다.
+    // 열 간격이 충돌 판정 거리(COLLIDE_DIST_NOM)보다 좁아지면 출발하자마자 서로 부딪히므로,
+    // 열 수를 3개로 제한하고 간격에 충분한 여유(20 기준 +~9)를 둔다. 지터도 그 여유 안에서만 흔든다.
+    const gridCols = Math.min(karts.length, 3);
+    const gridUsableHalfW = LANE_MAX * 0.9; // 벽 쪽 여유를 남기고 실제로 쓰는 폭(전 구간에서 안전한 범위)
+    const gridColSpacingNom = (gridUsableHalfW * 2) / gridCols;
+    const gridLaneJitter = Math.min(3, gridColSpacingNom * 0.15);
+    const gridRowGapNom = Math.max(30, gridColSpacingNom); // 줄 사이 간격(nominal) — 뒷줄일수록 더 뒤에서 출발
+    const gridProgressJitterNom = 3;
+    const slotOrder = karts.map((_, i) => i);
+    for (let i = slotOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slotOrder[i], slotOrder[j]] = [slotOrder[j], slotOrder[i]];
+    }
+    slotOrder.forEach((kartIdx, slot) => {
+      const col = slot % gridCols, row = Math.floor(slot / gridCols);
+      const k = karts[kartIdx];
+      k.lane = (gridCols === 1 ? 0 : -gridUsableHalfW + ((col + 0.5) / gridCols) * (gridUsableHalfW * 2)) + rFloat(-gridLaneJitter, gridLaneJitter);
+      k.progress = (-row * gridRowGapNom + rFloat(-gridProgressJitterNom, gridProgressJitterNom)) / trackTotalLen;
+    });
     // 카운트다운 중엔 update()가 안 돌아서 sx/sy가 초기값(0,0=화면 좌상단)에 머무른다 —
     // 만들자마자 출발선 위치를 한 번 계산해둬야 카운트다운 때도 출발선에 서 있는 것처럼 보인다.
     for (const k of karts) {
