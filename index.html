@@ -3492,20 +3492,14 @@ window.Router = {
     if (f < FORK_END) return sampleLUT(branch === "A" ? forkALUT : forkBLUT, (f - FORK_START) / (FORK_END - FORK_START));
     return sampleLUT(mainBLUT, (f - FORK_END) / (1 - FORK_END));
   }
-  // 해당 지점의 커브가 "어느 쪽으로 얼마나 급하게" 꺾이는지(진행률당 각도 변화율, 부호 있음).
-  // 부호는 트랙 좌표계와 일치: 값이 양수면 안쪽이 +lane 방향, 음수면 -lane 방향이다
-  // (센터라인의 곡률 벡터가 항상 (-sin(angle), cos(angle)) = 우리 lane+ 방향과 나란하기 때문).
-  function signedTurnRateAt(progress, branch) {
+  // 해당 지점의 커브가 얼마나 급한지(진행률당 각도 변화율)를 재서 급커브일수록 살짝 감속되게 한다.
+  // "약간"만 줄이는 게 목표라 최대 감속폭을 14%로 제한한다.
+  function curveFactorAt(progress, branch) {
     const d = 0.006;
     const p1 = trackSample(progress - d, branch), p2 = trackSample(progress + d, branch);
     let da = p2.angle - p1.angle;
     da = ((da + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-    return da / (2 * d);
-  }
-  // 커브가 얼마나 급한지(부호 무시)를 재서 급커브일수록 살짝 감속되게 한다.
-  // "약간"만 줄이는 게 목표라 최대 감속폭을 14%로 제한한다.
-  function curveFactorAt(progress, branch) {
-    const turnRate = Math.abs(signedTurnRateAt(progress, branch));
+    const turnRate = Math.abs(da) / (2 * d);
     return Math.max(0.86, 1 - Math.min(1, turnRate / 40) * 0.14);
   }
   // 분기점(FORK_START)·합류점(FORK_END)에서는 서로 다른 스플라인으로 넘어가며 접선 각도가
@@ -3536,13 +3530,13 @@ window.Router = {
 
   const TRACK_HALF_W_NOM = 68; // 트랙 도로 폭(편측, nominal 단위) — forkA/forkB/mainB 및 mainA의 기준폭
 
-  // mainA는 구간별로 폭이 다르다: 첫 구간(출발 직선)은 20% 더 넓게, 분기 전(상행~시케인) 구간은 10% 더 좁게.
+  // mainA는 구간별로 폭이 다르다: 첫 구간(출발 직선)은 훨씬 더 넓게, 분기 전(상행~시케인) 구간은 10% 더 좁게.
   // 두 값 사이는 급격한 폭 변화로 도로 가장자리가 꺾여 보이지 않도록 부드럽게(smoothstep) 전환한다.
   const MAINA_STRAIGHT_FRAC = (() => {
     const idx = Math.min(2 * MAINA_STEPS, mainALUT.pts.length - 1); // mainAWP[2]({900,575}), 첫 직선이 끝나는 지점
     return mainALUT.cum[idx] / mainALUT.total;
   })();
-  const MAINA_HALFW_START = TRACK_HALF_W_NOM * 1.2;   // 첫 구간: 20% 더 넓게
+  const MAINA_HALFW_START = TRACK_HALF_W_NOM * 1.6;   // 출발 직선: 기존(20% 확장) 대비 한 번 더 넓혀 60% 확장
   const MAINA_HALFW_PREFORK = TRACK_HALF_W_NOM * 0.9; // 분기 전 구간: 10% 더 좁게
   const MAINA_WIDTH_TRANS = 0.05; // 전환 구간 폭(mainA 자체 진행률 기준)
   function mainAHalfWidthAt(fracInA) {
@@ -3642,30 +3636,6 @@ window.Router = {
   const ITEM_ICON = { banana: "🍌", fireball: "🔥", boost: "🚀", bomb: "💣", invincible: "✨", lightning: "⚡", fog: "🌫️" };
   const raceProgress = kart => kart.lap + ((kart.progress % 1 + 1) % 1); // 랩 + 이번 랩 진행률(순위 비교용)
 
-  // ---------- 조향(레인 선택) 자유도 ----------
-  // 지금까지 카트는 직진 위주였고 lane은 충돌/피격 때만 반응적으로 바뀌었다. 여기서는 "다가오는 커브의
-  // 안쪽으로 미리 파고들기"와 "가까운 아이템 박스로 다가가기"를 매 프레임 계산해 목표 레인을 정하고,
-  // 그 목표로 서서히(rate-limited) 수렴시킨다 — driveMult를 부드럽게 수렴시키는 것과 같은 방식.
-  const CURVE_STEER_LOOKAHEAD = 0.018; // 커브 진입 전 미리 반응하기 시작하는 선행 거리(진행률 기준)
-  const CURVE_STEER_MAX_FRAC = 0.55;   // 커브에서 파고드는 최대 편심(LANE_MAX 대비 비율)
-  const ITEM_SEEK_RANGE_NOM = 230;     // 이 거리(nominal) 안에 있는 아이템만 "노려서" 다가간다
-  const LANE_FOLLOW_RATE = 2.4;        // 목표 레인으로 수렴하는 속도(초당 비율 — 즉각 스냅되지 않게)
-  // 아이템이 아주 멀리 있는데 갑자기 수직으로 꺾어 들어가면 어색하므로, 거리에 비례해 영향력이
-  // 0으로 스르르 사라지게 한다(위 ITEM_SEEK_RANGE_NOM 밖이면 아예 고려하지 않음).
-  function findSeekPickup(kart) {
-    let best = null, bestDist = Infinity;
-    for (const pk of pickups) {
-      if (pk.taken) continue;
-      let d = ((pk.progress - kart.progress) % 1 + 1) % 1;
-      if (d > 0.5) d -= 1;
-      if (d <= 0) continue; // 이미 지나간(뒤에 있는) 픽업은 좇지 않는다
-      const distNom = d * trackTotalLen;
-      if (distNom < bestDist) { bestDist = distNom; best = pk; }
-    }
-    if (!best || bestDist > ITEM_SEEK_RANGE_NOM) return null;
-    return { pk: best, distNom: bestDist };
-  }
-
   function makeKart(name, idx) {
     return {
       name, color: PALETTE[idx % PALETTE.length],
@@ -3676,10 +3646,6 @@ window.Router = {
       driveMult: 1, // 커브/충돌 감속과 직진 가속을 서서히 반영하는 관성 배율(가속도 느낌)
       item: null, itemPickedAt: 0, decisionAt: rFloat(0, 0.6),
       sx: 0, sy: 0, angle: 0, recentHit: 0,
-      // 조향 개성: 다들 계산된 최적 궤적만 똑같이 타면 로봇처럼 보이므로, 카트마다 얼마나
-      // 적극적으로 커브/아이템을 향해 파고드는지(steerBias)와 천천히 흔들리는 개인 버릇
-      // (steerNoiseFreq/steerSeed, 위상·주기가 서로 달라 "적절한" 랜덤 변주가 되게 한다)을 부여한다.
-      steerBias: rFloat(0.75, 1.25), steerNoiseFreq: rFloat(0.4, 0.9), steerSeed: rFloat(0, Math.PI * 2),
     };
   }
 
@@ -3868,7 +3834,7 @@ window.Router = {
     target.recentHit = 2.5;
     addBurst(p.x, p.y, target.color, 10);
   }
-  const BOMB_RADIUS_NOM = 150; // 폭탄 폭발 반경(nominal 단위) — 광역 요청으로 확대
+  const BOMB_RADIUS_NOM = 225; // 폭탄 폭발 반경(nominal 단위) — 기존(150) 대비 1.5배로 확대
   // 폭탄은 이제 "쓰자마자 즉시 터지는" 게 아니라, 그 자리에 내려놓고 3초 뒤에 쾅 터진다(hazards에서 처리).
   // 이 함수는 실제 폭발 순간에만 호출된다 — 화면좌표(p)를 직접 받아서, 설치 당시 위치에서 터지게 한다
   // (호출 시점엔 놓은 사람이 이미 다른 곳으로 이동해 있을 수 있으므로 kart 위치를 다시 읽지 않는다).
@@ -3985,27 +3951,6 @@ window.Router = {
             if (!reduceMotion) launchConfetti(kart.color);
           } else beep(660, 0.08);
         }
-      }
-
-      // 레인 조향: 스핀/스턴 중엔(제어권이 없으므로) 건드리지 않고, 그 외엔 매 프레임 목표 레인을
-      // 계산해 서서히 수렴시킨다 — 커브 안쪽으로 파고들기 + 근처 아이템으로 다가가기 + 개인 변주.
-      if (kart.spinT <= 0 && kart.stunT <= 0) {
-        const turnRate = signedTurnRateAt(kart.progress + CURVE_STEER_LOOKAHEAD, kart.branch);
-        let desiredLane = Math.sign(turnRate) * Math.min(1, Math.abs(turnRate) / 40) * LANE_MAX * CURVE_STEER_MAX_FRAC * kart.steerBias;
-
-        if (!kart.item) {
-          const seek = findSeekPickup(kart);
-          if (seek) {
-            // 가까울수록(w→1) 아이템 쪽 레인이 우선하고, 멀수록(w→0) 커브 조향으로 스르르 되돌아간다
-            const w = (1 - seek.distNom / ITEM_SEEK_RANGE_NOM) * 0.85;
-            desiredLane = desiredLane * (1 - w) + seek.pk.lane * w;
-          }
-        }
-        // 계산된 "최적 궤적"만 다들 똑같이 타면 로봇처럼 보이므로, 카트마다 다른 위상/주기로
-        // 천천히(급하지 않게) 흔들리는 랜덤 변주를 살짝 얹는다.
-        desiredLane += Math.sin(raceT * kart.steerNoiseFreq + kart.steerSeed) * LANE_MAX * 0.12;
-        desiredLane = Math.max(-LANE_MAX * 0.92, Math.min(LANE_MAX * 0.92, desiredLane));
-        kart.lane += (desiredLane - kart.lane) * Math.min(1, LANE_FOLLOW_RATE * ds);
       }
 
       decideItemUse(kart, ds);
