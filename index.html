@@ -207,11 +207,11 @@
   @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
   .winner-card {
     background: #fff; border: 2.5px solid var(--ink); border-radius: 16px;
-    box-shadow: 8px 8px 0 var(--ink); padding: 30px 40px; text-align: center;
-    transform: rotate(-1.2deg); max-width: 90vw; max-height: 86vh; overflow-y: auto;
+    box-shadow: 8px 8px 0 var(--ink); padding: 24px 40px; text-align: center;
+    transform: rotate(-1.2deg); max-width: 90vw; max-height: 96vh; overflow-y: auto;
   }
   .winner-eyebrow { font-size: 13px; font-weight: 800; letter-spacing: .25em; text-transform: uppercase; color: var(--ink-soft); }
-  .wlist { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 6px; min-width: min(320px, 78vw); }
+  .wlist { display: flex; flex-direction: column; gap: 7px; margin: 14px 0 6px; min-width: min(320px, 78vw); }
   .wrow { display: flex; align-items: center; gap: 12px; text-align: left; }
   .wrank {
     font-weight: 900; font-size: 13px; color: #fff; background: var(--ink);
@@ -222,6 +222,7 @@
   .wname { flex: 1; font-weight: 900; font-size: clamp(20px, 5vw, 30px); letter-spacing: -1px; line-height: 1.1; }
   .wrow.gold .wname { font-size: clamp(28px, 7vw, 46px); }
   .wweap { font-size: 13px; color: var(--ink-soft); font-weight: 700; flex: none; }
+  .wtime { font-size: 13px; color: var(--ink-soft); font-weight: 700; flex: none; font-variant-numeric: tabular-nums; }
   .wsub { font-size: 13px; color: var(--ink-soft); font-weight: 700; text-align: left; margin-top: 2px; }
   .winner-actions { display: flex; gap: 10px; margin-top: 18px; justify-content: center; flex-wrap: wrap; }
   .winner-actions button { box-shadow: var(--shadow); }
@@ -266,30 +267,42 @@
   }
   .menu-caption b { color: var(--amber); font-weight: 700; }
 
+  /* 게임 수(--cab-cols)에 맞춰 항상 균등한 행렬로 배치한다: 4개=2x2, 5개=3+2, 6개=3+3.
+     flex-wrap로 자연 줄바꿈시키되, 폭을 "정확히 cols개가 한 줄에 들어가는" 값으로 고정해서
+     마지막 줄이 모자라도(5개=3+2) justify-content:center가 그 줄만 알아서 가운데로 모아준다. */
   #cabRow {
+    --cab-cols: 4; --cab-gap: clamp(14px, 3vw, 34px);
     flex: 1; display: flex; align-items: center; justify-content: center;
-    gap: clamp(14px, 3vw, 34px); width: 100%; max-width: 1080px;
+    gap: var(--cab-gap); width: 100%;
+    /* 컨테이너 자체를 "cols장 + 그 사이 gap"만큼만 넓히고 나머지는 카드에 균등 분배 —
+       그래야 실제로 한 줄에 정확히 cols개만 들어가고, 남는 줄(5개=3+2)은 가운데로 모인다 */
+    max-width: calc(var(--cab-cols) * 261px + (var(--cab-cols) - 1) * var(--cab-gap));
     padding: 10px 0; flex-wrap: wrap;
   }
   .cab {
     -webkit-appearance: none; appearance: none;
-    width: clamp(215px, 26vw, 290px);
+    flex: 0 0 auto;
+    /* 카드 하나하나 크기를 기존 대비 10% 축소(215~290px → 194~261px) */
+    width: clamp(194px, calc((100% - (var(--cab-cols) - 1) * var(--cab-gap)) / var(--cab-cols)), 261px);
     background: linear-gradient(180deg, #12152b, #0a0c1c);
     border: 2px solid #2a3054; border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
-    padding: 0 0 14px; cursor: pointer; text-align: center;
+    padding: 0 0 12px; cursor: pointer; text-align: center;
     font-family: inherit; color: #cdd6f4;
     transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
     position: relative;
   }
+  /* 카드 세로 높이를 기존 대비 10% 축소 — marq/scr/kname/desc/players 각각의
+     세로 여백·글자크기를 함께 줄여서 특정 한 요소만 뭉개지지 않게 한다. 스크린샷
+     캔버스 자체 높이(intrinsic height 속성, HTML 쪽)도 130→117로 같이 낮춘다. */
   .cab .marq {
-    display: block; border-radius: 10px 10px 0 0; padding: 9px 8px 8px;
+    display: block; border-radius: 10px 10px 0 0; padding: 7px 8px 6px;
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-weight: 700; font-size: clamp(12px, 1.3vw, 14px); letter-spacing: .22em; color: #0a0c1c;
+    font-weight: 700; font-size: clamp(11px, 1.3vw, 13px); letter-spacing: .22em; color: #0a0c1c;
     text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .cab .scr {
-    margin: 10px 12px 0; border-radius: 6px; background: #04050c;
+    margin: 9px 12px 0; border-radius: 6px; background: #04050c;
     border: 2px solid #1d2340; overflow: hidden; position: relative;
   }
   .cab .scr canvas { display: block; width: 100%; height: auto; }
@@ -299,13 +312,13 @@
       rgba(0,0,0,0) 0 2px, rgba(0,0,0,.28) 2px 3px);
     pointer-events: none;
   }
-  .cab .kname { display: block; margin-top: 11px; font-weight: 900; font-size: 17px; color: #eef2ff; letter-spacing: -.2px; }
-  .cab .desc { display: block; margin-top: 4px; font-size: 12px; line-height: 1.5; color: #8892bb; padding: 0 14px; min-height: 36px; }
+  .cab .kname { display: block; margin-top: 10px; font-weight: 900; font-size: 15px; color: #eef2ff; letter-spacing: -.2px; }
+  .cab .desc { display: block; margin-top: 4px; font-size: 11px; line-height: 1.4; color: #8892bb; padding: 0 14px; min-height: 32px; }
   .cab .players {
-    display: inline-block; margin-top: 9px;
+    display: inline-block; margin-top: 8px;
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 10.5px; letter-spacing: .22em; color: var(--amber);
-    border: 1px solid rgba(255,201,60,.4); border-radius: 4px; padding: 3px 8px;
+    font-size: 9.5px; letter-spacing: .22em; color: var(--amber);
+    border: 1px solid rgba(255,201,60,.4); border-radius: 4px; padding: 3px 7px;
   }
   .cab .sel-arrow {
     position: absolute; top: 50%; left: -26px; transform: translateY(-50%);
@@ -338,6 +351,12 @@
     font-size: 9px; letter-spacing: .22em; color: #2a3054; margin-top: 4px;
   }
 
+  /* 모바일(좁은 화면)에서는 항상 세로 한 줄로 쌓는다 — 격자 계산 대신 폭 100%로 고정 */
+  @media (max-width: 640px) {
+    #cabRow { flex-direction: column; max-width: 342px; }
+    .cab { width: 100%; max-width: 306px; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     #insertCoin, #menuInner, .cab.sel .sel-arrow, .cd-layer .num.anim, .result-layer.show { animation: none; }
     .cab, .cab.sel { transition: none; }
@@ -355,7 +374,7 @@
       <button class="cab sel" data-game="battle" style="--mc:#ff2d78">
         <span class="sel-arrow">▶</span>
         <span class="marq" style="background:linear-gradient(90deg,#ff2d78,#ff7a5c)">BATTLE ROYALE</span>
-        <span class="scr"><canvas data-icon="battle" width="252" height="130"></canvas></span>
+        <span class="scr"><canvas data-icon="battle" width="252" height="114"></canvas></span>
         <span class="kname">⚔️ 배틀로얄</span>
         <span class="desc">무기 든 졸라맨들이 링에서 난투!<br>마지막 생존자·지정 등수를 추첨</span>
         <span class="players">2-30 PLAYERS</span>
@@ -364,7 +383,7 @@
       <button class="cab" data-game="ladder" style="--mc:#35f0e0">
         <span class="sel-arrow">▶</span>
         <span class="marq" style="background:linear-gradient(90deg,#35f0e0,#4c9dff)">GHOST LEG</span>
-        <span class="scr"><canvas data-icon="ladder" width="252" height="130"></canvas></span>
+        <span class="scr"><canvas data-icon="ladder" width="252" height="114"></canvas></span>
         <span class="kname">🪜 사다리타기</span>
         <span class="desc">고전 사다리 + 순간이동 구멍!<br>쏙 빨려서 반대편에 뿅 떨어진다</span>
         <span class="players">2-15 PLAYERS</span>
@@ -373,7 +392,7 @@
       <button class="cab" data-game="relay" style="--mc:#ffc93c">
         <span class="sel-arrow">▶</span>
         <span class="marq" style="background:linear-gradient(90deg,#ffc93c,#8be04c)">RELAY RUN</span>
-        <span class="scr"><canvas data-icon="relay" width="252" height="130"></canvas></span>
+        <span class="scr"><canvas data-icon="relay" width="252" height="114"></canvas></span>
         <span class="kname">🏃 계주 달리기</span>
         <span class="desc">8레인 트랙을 도는 졸라맨 계주!<br>반 바퀴마다 바톤 터치, 막판 역전</span>
         <span class="players">2-24 PLAYERS</span>
@@ -382,9 +401,9 @@
       <button class="cab" data-game="kart" style="--mc:#8b3ff0">
         <span class="sel-arrow">▶</span>
         <span class="marq" style="background:linear-gradient(90deg,#8b3ff0,#ff2d78)">KART DASH</span>
-        <span class="scr"><canvas data-icon="kart" width="252" height="130"></canvas></span>
+        <span class="scr"><canvas data-icon="kart" width="252" height="114"></canvas></span>
         <span class="kname">🏎️ 카트 레이싱</span>
-        <span class="desc">분기·합류 트랙을 10바퀴! 아이템 먹고<br>부딪히며 자동으로 펼치는 난전 레이스</span>
+        <span class="desc">분기·합류 트랙을 7바퀴! 아이템 먹고<br>부딪히며 자동으로 펼치는 난전 레이스</span>
         <span class="players">2-16 PLAYERS</span>
       </button>
     </div>
@@ -743,6 +762,14 @@ window.GameRecorder = (() => {
   const menuEl = document.getElementById("menu");
   const cabs = [...document.querySelectorAll(".cab")];
   let sel = 0;
+
+  // 게임 캐비닛 수에 맞춰 열 개수를 정한다: 4개→2x2, 5개→3+2, 6개→3+3 스타일로 항상 정사각형에 가까운 행렬이 되게.
+  // (3개 이하는 한 줄에 다 놓고, 7개부터는 같은 규칙을 이어서 2행으로 배분)
+  (() => {
+    const n = cabs.length;
+    const cols = n <= 3 ? Math.max(1, n) : Math.ceil(n / 2);
+    document.getElementById("cabRow").style.setProperty("--cab-cols", cols);
+  })();
 
   // --- 픽셀 비트맵 로고 ---
   const GLYPHS = {
@@ -3347,6 +3374,10 @@ window.GameRecorder = (() => {
 
 <!-- ================= GAME 4: 카트 레이싱 ================= -->
 <style>
+  /* 카운트다운 숫자는 공용 .cd-layer .num 스타일(진한 남색)을 그대로 쓰면 카트 게임의
+     어두운 도로 위에서 거의 안 보인다 — 이 게임에서만 흰 글자 + 짙은 아웃라인으로 덮어쓴다. */
+  #game-kart .cd-layer .num { color: #fff; text-shadow: 0 0 16px rgba(0,0,0,.55), 4px 4px 0 rgba(28,32,48,.55); }
+  #game-kart .cd-layer .num.fight { color: #ffd23c; text-shadow: 0 0 16px rgba(0,0,0,.6), 3px 3px 0 rgba(28,32,48,.55); }
   .kart-hud {
     position: absolute; top: 14px; left: 14px; z-index: 10;
     width: 210px; max-height: calc(100% - 28px); overflow-y: auto;
@@ -3360,13 +3391,48 @@ window.GameRecorder = (() => {
   .kart-hud li { font-weight: 700; margin-bottom: 3px; display: flex; gap: 6px; align-items: center; }
   .kart-hud li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .kart-hud li .lp { color: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .kart-hud li .lapown { color: var(--accent-deep); font-size: 10.5px; font-weight: 800; flex: none; font-variant-numeric: tabular-nums; }
+
+  /* 남은 랩 수 + 1위 이름을 화면 중앙에 크게 짠! 띄웠다가 사라지는 팝업 */
+  .kart-lap-pop {
+    position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; pointer-events: none;
+    opacity: 0; text-align: center;
+  }
+  .kart-lap-pop .lapnum {
+    font-size: clamp(56px, 11vw, 120px); font-weight: 900; color: var(--accent);
+    letter-spacing: -2px; text-shadow: 6px 6px 0 rgba(28,32,48,.16);
+  }
+  .kart-lap-pop .leader {
+    margin-top: 4px; font-size: clamp(20px, 3.4vw, 34px); font-weight: 800; color: var(--ink);
+    text-shadow: 3px 3px 0 rgba(255,255,255,.7);
+  }
+  .kart-lap-pop.show { animation: ktLapPop 2.4s cubic-bezier(.2,1,.3,1) both; }
+  @keyframes ktLapPop {
+    0% { opacity: 0; transform: scale(.5); }
+    14% { opacity: 1; transform: scale(1.12); }
+    22% { transform: scale(1); }
+    78% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(.94); }
+  }
+  /* 1등 골인 후 레이스 종료까지 남은 10초 카운트다운(공용 cd-layer 재사용, 캡션만 추가) */
+  .finish-cd { display: flex; flex-direction: column; align-items: center; }
+  .finish-cd .fcd-caption {
+    font-size: clamp(14px, 2.4vw, 22px); font-weight: 800; color: #fff;
+    text-shadow: 0 0 10px rgba(0,0,0,.55), 2px 2px 0 rgba(28,32,48,.55);
+    margin-bottom: 2px; letter-spacing: .04em;
+  }
 </style>
 
 <div id="game-kart" class="screen paper" hidden>
   <canvas id="ktCanvas" class="stage"></canvas>
   <div id="ktHud" class="kart-hud" hidden>
-    <h4><span>순위</span><span class="lapn" id="ktLapInfo">0/10 랩</span></h4>
+    <h4><span>순위</span></h4>
     <ol id="ktRankList"></ol>
+  </div>
+  <div id="ktLapPop" class="kart-lap-pop" aria-hidden="true">
+    <div class="lapnum"></div>
+    <div class="leader"></div>
   </div>
 
   <div id="ktControls" class="topctl" hidden>
@@ -3382,7 +3448,7 @@ window.GameRecorder = (() => {
       <h1 class="title">졸라 <span class="pop">카트 레이싱</span></h1>
       <p class="subtitle">
         이름을 한 줄에 하나씩. 직선·꼬불꼬불한 커브·<b>갈라졌다 합쳐지는 분기 구간</b>이 있는
-        트랙을 <b>10바퀴</b> 돌아 순위를 가립니다. 레인 구분 없이 전원이 자유롭게 경쟁하며
+        트랙을 <b>7바퀴</b> 돌아 순위를 가립니다. 레인 구분 없이 전원이 자유롭게 경쟁하며
         서로 부딪히고, 트랙에 뿅 나타나는 <b>아이템</b>(🍌🔥🚀💣✨)을 주워 알아서 사용합니다.
       </p>
 
@@ -3422,14 +3488,16 @@ window.GameRecorder = (() => {
   const setupEl = $("ktSetup"), namesEl = $("ktNames"), countEl = $("ktCount");
   const controls = $("ktControls"), cdEl = $("ktCountdown");
   const resultEl = $("ktResult"), resultList = $("ktResultList");
-  const hudEl = $("ktHud"), lapInfoEl = $("ktLapInfo"), rankListEl = $("ktRankList");
+  const hudEl = $("ktHud"), rankListEl = $("ktRankList");
+  const lapPopEl = $("ktLapPop"), lapPopNumEl = lapPopEl.querySelector(".lapnum"), lapPopLeaderEl = lapPopEl.querySelector(".leader");
+  let lastPopLaps = null; // 남은 랩 수가 바뀔 때만(리더가 랩을 돌 때) 팝업을 새로 띄우기 위한 기억값
 
   const PALETTE = [
     "#e23c1f", "#1f7ae0", "#27a85a", "#8b3ff0", "#f2a900",
     "#e0408f", "#0fb3b3", "#7a5230", "#3b4cca", "#5a8f00",
     "#c0407a", "#0a8fa0",
   ];
-  const TOTAL_LAPS = 10;
+  const TOTAL_LAPS = 7;
   const rFloat = (a, b) => a + Math.random() * (b - a);
   const rInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -3457,7 +3525,7 @@ window.GameRecorder = (() => {
   // 호 길이(arc-length) 테이블을 만들어 진행률(0~1)에 따라 등속으로 위치를 뽑는다.
   // 분기 구간은 "픽셀 길이를 맞추는 것"이 아니라 "전체 랩 진행률 예산을 동일하게 배분"하는
   // 방식으로 처리해서, 어느 분기를 타든 진행률 계산이 항상 일관되게 만든다.
-  const NOM_W = 1000, NOM_H = 640;
+  const NOM_W = 1200, NOM_H = 660;
 
   function catmullRom(p0, p1, p2, p3, t) {
     const t2 = t * t, t3 = t2 * t;
@@ -3498,36 +3566,42 @@ window.GameRecorder = (() => {
     return { x, y, angle };
   }
 
-  // 웨이포인트(직선 → 우회전 → S자 꼬불 구간 → 분기 진입점)
-  const P0 = { x: 200, y: 560 };
+  // 웨이포인트(직선 → 우측 상행 → 우상단 대형 스윕 → S자 시케인 → 분기 진입점)
+  // 도로 폭이 넓어(TRACK_HALF_W_NOM 참고) 평행 구간은 중심선 간격을 최소 ~150 이상 확보한다.
+  const P0 = { x: 250, y: 575 };
   const mainAWP = [
-    P0, { x: 500, y: 560 }, { x: 760, y: 560 }, { x: 860, y: 500 }, { x: 860, y: 380 },
-    { x: 800, y: 300 }, { x: 700, y: 260 }, { x: 650, y: 320 }, { x: 600, y: 260 },
-    { x: 520, y: 220 }, { x: 450, y: 210 },
+    P0, { x: 580, y: 575 }, { x: 900, y: 575 },              // 바닥 직선
+    { x: 1065, y: 540 }, { x: 1125, y: 430 }, { x: 1125, y: 300 }, // 우측 상행
+    { x: 1065, y: 165 }, { x: 945, y: 105 },                 // 우상단 대형 스윕
+    { x: 830, y: 165 }, { x: 745, y: 295 }, { x: 660, y: 165 },   // S자 시케인
+    { x: 555, y: 230 },
   ];
   const FORK_OUT = mainAWP[mainAWP.length - 1];
-  const FORK_IN = { x: 250, y: 210 };
+  const FORK_IN = { x: 295, y: 230 };
   // 직선 급행로: 완만하게 크게 스윙 (턴각이 작아 "쭉 뻗은" 느낌, 대신 길이는 길다)
-  const forkAWP = [FORK_OUT, { x: 395, y: 30 }, { x: 305, y: 30 }, FORK_IN];
-  // 숏컷: 직선 경로에 바짝 붙은 좁은 지그재그 (턴각이 커 "구불구불"하지만 길이는 짧다)
-  const forkBWP = [FORK_OUT, { x: 395, y: 232 }, { x: 350, y: 195 }, { x: 305, y: 232 }, FORK_IN];
+  const forkAWP = [FORK_OUT, { x: 470, y: 65 }, { x: 375, y: 65 }, FORK_IN];
+  // 숏컷: 아래로 살짝 처지는 완만한 안쪽 커브 (도로 폭이 넓어 지그재그는 뭉개져 보이므로 단일 커브로)
+  const forkBWP = [FORK_OUT, { x: 460, y: 305 }, { x: 390, y: 305 }, FORK_IN];
   // 합류 이후: 좌측을 타고 내려와 출발선으로 복귀 (mainB의 마지막 점은 반드시 P0과 동일해야 루프가 이어짐)
   const mainBWP = [
-    FORK_IN, { x: 160, y: 220 }, { x: 100, y: 300 }, { x: 100, y: 420 },
-    { x: 140, y: 500 }, { x: 200, y: 550 }, { x: 200, y: 560 },
+    FORK_IN, { x: 180, y: 255 }, { x: 108, y: 345 }, { x: 105, y: 460 },
+    { x: 150, y: 545 }, { x: 250, y: 575 },
   ];
 
-  const mainALUT = buildLUT(mainAWP, 22);
+  const MAINA_STEPS = 22;
+  const mainALUT = buildLUT(mainAWP, MAINA_STEPS);
   const forkALUT = buildLUT(forkAWP, 22);
   const forkBLUT = buildLUT(forkBWP, 22);
   const mainBLUT = buildLUT(mainBWP, 22);
   // 분기 구간의 진행률 예산은 각 구간의 실제 호 길이 비율로 배분한다 (임의 상수 X) —
   // 그래야 mainA/fork/mainB를 지날 때 화면상 속도가 균일하게 유지된다.
-  // (mainA≈1337 / fork평균≈260 / mainB≈497 단위 → 대략 0.638 / 0.124 / 0.238 비율)
   const forkAvgLen = (forkALUT.total + forkBLUT.total) / 2;
   const trackTotalLen = mainALUT.total + forkAvgLen + mainBLUT.total;
   const FORK_START = mainALUT.total / trackTotalLen;
   const FORK_END = FORK_START + forkAvgLen / trackTotalLen;
+  // 파이어볼 직선 이동 속도(nominal 단위/초) — 예전 레일 추종 속도(트랙 한 바퀴를 0.496배속으로 도는 것과
+  // 같은 체감 속도)를 그대로 물려받아, 직선으로 바뀌어도 "카트보다 훨씬 빠르다"는 느낌은 유지한다.
+  const FIREBALL_SPEED_NOM = trackTotalLen * 0.496;
 
   function trackSample(progress, branch) {
     let f = ((progress % 1) + 1) % 1;
@@ -3535,19 +3609,84 @@ window.GameRecorder = (() => {
     if (f < FORK_END) return sampleLUT(branch === "A" ? forkALUT : forkBLUT, (f - FORK_START) / (FORK_END - FORK_START));
     return sampleLUT(mainBLUT, (f - FORK_END) / (1 - FORK_END));
   }
+  // 해당 지점의 커브가 얼마나 급한지(진행률당 각도 변화율)를 재서 급커브일수록 살짝 감속되게 한다.
+  // "약간"만 줄이는 게 목표라 최대 감속폭을 14%로 제한한다.
+  function curveFactorAt(progress, branch) {
+    const d = 0.006;
+    const p1 = trackSample(progress - d, branch), p2 = trackSample(progress + d, branch);
+    let da = p2.angle - p1.angle;
+    da = ((da + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+    const turnRate = Math.abs(da) / (2 * d);
+    return Math.max(0.86, 1 - Math.min(1, turnRate / 40) * 0.14);
+  }
+  // 분기점(FORK_START)·합류점(FORK_END)에서는 서로 다른 스플라인으로 넘어가며 접선 각도가
+  // 뚝 끊긴다. 레인(lane) 오프셋이 0이 아닌 카트는 그 각도만큼 오프셋 방향이 즉시 꺾여서
+  // 화면상 옆으로 순간이동한 것처럼 보이므로, 경계 앞뒤 각도를 부드럽게 섞어서 완화한다.
+  const ANGLE_BLEND = 0.008; // 전환 폭(진행률 기준, 경계 앞뒤로 절반씩)
+  function blendedAngleAt(f, branch, rawAngle) {
+    let angle = rawAngle;
+    for (const boundary of [FORK_START, FORK_END]) {
+      const t = (f - (boundary - ANGLE_BLEND)) / (ANGLE_BLEND * 2);
+      if (t < 0 || t > 1) continue;
+      const before = trackSample(boundary - 1e-3, branch).angle;
+      const after = trackSample(boundary + 1e-3, branch).angle;
+      let d = after - before;
+      d = ((d + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+      angle = before + d * (t * t * (3 - 2 * t)); // smoothstep
+    }
+    return angle;
+  }
   // 진행률 + 차선(레인, nominal 단위의 좌우 오프셋) + 분기선택 → nominal 좌표
   function trackPosAt(progress, lane, branch) {
+    const f = ((progress % 1) + 1) % 1;
     const p = trackSample(progress, branch);
-    const nx = -Math.sin(p.angle), ny = Math.cos(p.angle);
-    return { x: p.x + nx * lane, y: p.y + ny * lane, angle: p.angle };
+    const angle = blendedAngleAt(f, branch, p.angle);
+    const nx = -Math.sin(angle), ny = Math.cos(angle);
+    return { x: p.x + nx * lane, y: p.y + ny * lane, angle };
   }
 
-  const TRACK_HALF_W_NOM = 46; // 트랙 도로 폭(편측, nominal 단위)
+  const TRACK_HALF_W_NOM = 68; // 트랙 도로 폭(편측, nominal 단위) — forkA/forkB/mainB 및 mainA의 기준폭
+
+  // mainA는 구간별로 폭이 다르다: 첫 구간(출발 직선)은 훨씬 더 넓게, 분기 전(상행~시케인) 구간은 10% 더 좁게.
+  // 두 값 사이는 급격한 폭 변화로 도로 가장자리가 꺾여 보이지 않도록 부드럽게(smoothstep) 전환한다.
+  const MAINA_STRAIGHT_FRAC = (() => {
+    const idx = Math.min(2 * MAINA_STEPS, mainALUT.pts.length - 1); // mainAWP[2]({900,575}), 첫 직선이 끝나는 지점
+    return mainALUT.cum[idx] / mainALUT.total;
+  })();
+  const MAINA_HALFW_START = TRACK_HALF_W_NOM * 1.6;   // 출발 직선: 기존(20% 확장) 대비 한 번 더 넓혀 60% 확장
+  const MAINA_HALFW_PREFORK = TRACK_HALF_W_NOM * 0.9; // 분기 전 구간: 10% 더 좁게
+  const MAINA_WIDTH_TRANS = 0.05; // 전환 구간 폭(mainA 자체 진행률 기준)
+  function mainAHalfWidthAt(fracInA) {
+    const t = Math.max(0, Math.min(1,
+      (fracInA - (MAINA_STRAIGHT_FRAC - MAINA_WIDTH_TRANS / 2)) / MAINA_WIDTH_TRANS));
+    const s = t * t * (3 - 2 * t); // smoothstep
+    return MAINA_HALFW_START + (MAINA_HALFW_PREFORK - MAINA_HALFW_START) * s;
+  }
+
+  // 파이어볼이 트랙 벽(도로 경계)에 완전탄성 충돌로 튕기게 하려면, "가장 가까운 트랙 중심선 점 +
+  // 그 지점의 반폭"을 빠르게 조회할 수 있어야 한다. mainA/forkA/forkB/mainB의 LUT 점을 한 번만
+  // 합쳐서 캐시해둔다(4갈래가 공간적으로 겹치지 않으므로 branch 구분 없이 최근접 탐색만으로 충분하다).
+  const trackWallPts = (() => {
+    const pts = [];
+    for (let i = 0; i < mainALUT.pts.length; i++) {
+      const p = mainALUT.pts[i];
+      pts.push({ x: p.x, y: p.y, halfW: mainAHalfWidthAt(mainALUT.cum[i] / mainALUT.total) });
+    }
+    for (const lut of [forkALUT, forkBLUT, mainBLUT]) {
+      for (const p of lut.pts) pts.push({ x: p.x, y: p.y, halfW: TRACK_HALF_W_NOM });
+    }
+    return pts;
+  })();
 
   // ---------- 화면 맞춤 변환 (nominal → screen) ----------
   let TR = { scale: 1, offX: 0, offY: 0 };
   let W = 0, H = 0, DPR = 1;
   let trackPaths = null; // 리사이즈 때만 재계산되는 Path2D 캐시
+  // mainA는 구간별 폭 변화 때문에 잘게 쪼갠 세그먼트를 여러 번 그려야 해서, 매 프레임 다시 그리면 비용이
+  // 크다. 리사이즈될 때만 트랙 전체(테두리·도로면·라벨)를 오프스크린 캔버스에 한 번 그려두고,
+  // 실제 프레임에서는 그 이미지를 그대로 복사(drawImage)만 한다.
+  const trackCacheCanvas = document.createElement("canvas");
+  const tctx = trackCacheCanvas.getContext("2d");
 
   function toScreen(nx, ny) { return { x: TR.offX + nx * TR.scale, y: TR.offY + ny * TR.scale }; }
 
@@ -3569,13 +3708,14 @@ window.GameRecorder = (() => {
   }
 
   function computeTransform() {
-    const marginTop = 96, marginBot = 34, marginX = 40;
+    const marginTop = 90, marginBot = 22, marginX = 26;
     const availW = Math.max(100, W - marginX * 2), availH = Math.max(100, H - marginTop - marginBot);
     const scale = Math.min(availW / NOM_W, availH / NOM_H);
     TR.scale = scale;
     TR.offX = (W - NOM_W * scale) / 2;
     TR.offY = marginTop + (availH - NOM_H * scale) / 2;
     buildTrackPaths();
+    renderTrackCache();
   }
 
   function resize() {
@@ -3598,15 +3738,19 @@ window.GameRecorder = (() => {
   // ================= 게임 상태 =================
   let state = "idle"; // idle | countdown | racing | done
   let karts = [], projectiles = [], hazards = [], pickups = [], particles = [], confetti = [];
+  let lightningBolts = []; // 번개 아이템의 큰 시각 이펙트(잠깐 표시되는 번개 줄기)
+  let lightningCasts = []; // 번개 예고(사용 즉시 화면이 어두워지고, 0.5초 뒤에 실제로 내리꽂힘)
+  let fog = { t: 0, immune: null }; // 안개 아이템: 지속시간 + 안개를 쓴(면역인) 카트
   let raceT = 0, firstFinishT = null, placesGiven = 0, nextPickupT = 0;
+  let postFinishCdLabel = null; // 1등 골인 후 10초 카운트다운 표시용
   let cdStart = 0, cdLabel = "_";
   let rafId = null, lastTs = 0;
 
   const LAPS_PER_SEC_BASE = 1 / 6.5; // 랩 1개 기준 소요시간(노이즈 적용 전) — 기존 대비 20% 느리게
   const LANE_MAX = TRACK_HALF_W_NOM * 0.72;
   const COLLIDE_DIST_NOM = 20; // nominal 단위 충돌 판정 거리
-  const ITEM_TYPES = ["banana", "fireball", "boost", "bomb", "invincible"];
-  const ITEM_ICON = { banana: "🍌", fireball: "🔥", boost: "🚀", bomb: "💣", invincible: "✨" };
+  const ITEM_TYPES = ["banana", "fireball", "boost", "bomb", "invincible", "lightning", "fog"];
+  const ITEM_ICON = { banana: "🍌", fireball: "🔥", boost: "🚀", bomb: "💣", invincible: "✨", lightning: "⚡", fog: "🌫️" };
   const raceProgress = kart => kart.lap + ((kart.progress % 1 + 1) % 1); // 랩 + 이번 랩 진행률(순위 비교용)
 
   function makeKart(name, idx) {
@@ -3614,8 +3758,9 @@ window.GameRecorder = (() => {
       name, color: PALETTE[idx % PALETTE.length],
       progress: rFloat(-0.01, 0.01), lane: rFloat(-LANE_MAX * 0.6, LANE_MAX * 0.6),
       branch: Math.random() < 0.5 ? "A" : "B", forkLap: -1,
-      speedNoise: rFloat(0.88, 1.12), lap: 0, finished: false, place: 0,
-      boostT: 0, stunT: 0, spinT: 0, invincibleT: 0, wobble: 0,
+      speedNoise: rFloat(0.88, 1.12), lap: 0, finished: false, place: 0, finishTime: null,
+      boostT: 0, stunT: 0, spinT: 0, invincibleT: 0, impactT: 0, lightningT: 0, burnT: 0, wobble: 0,
+      driveMult: 1, // 커브/충돌 감속과 직진 가속을 서서히 반영하는 관성 배율(가속도 느낌)
       item: null, itemPickedAt: 0, decisionAt: rFloat(0, 0.6),
       sx: 0, sy: 0, angle: 0, recentHit: 0,
     };
@@ -3628,18 +3773,56 @@ window.GameRecorder = (() => {
     if (window.hideRecording) hideRecording();
     if (window.GameRecorder) GameRecorder.start(canvas);
     karts = names.map(makeKart);
+    // 출발 대열: 다들 좁게 뭉쳐서 출발하면 그 자리에서 바로 부딪히므로, 여러 열(가로)×여러 줄(세로)의
+    // 격자로 넓게 퍼뜨려 세운다. 격자 슬롯은 무작위로 섞어 배정해 이름 순서대로 정렬된 것처럼 보이지
+    // 않게 하고, 슬롯 안에서도 살짝 지터를 줘 딱딱해 보이지 않게 한다.
+    // 폭은 출발 직선 자체의 확장폭(MAINA_HALFW_START)이 아니라 LANE_MAX를 기준으로 잡는다 —
+    // 카트는 스스로 조향하지 않으므로(반응형 레인 변경만 있음), 출발 직선을 벗어나 도로가 다시
+    // 좁아지면 LANE_MAX보다 바깥에 있던 카트는 그대로 도로 밖으로 벗어나 보이게 된다.
+    // 열 간격이 충돌 판정 거리(COLLIDE_DIST_NOM)보다 좁아지면 출발하자마자 서로 부딪히므로,
+    // 열 수를 3개로 제한하고 간격에 충분한 여유(20 기준 +~9)를 둔다. 지터도 그 여유 안에서만 흔든다.
+    const gridCols = Math.min(karts.length, 3);
+    const gridUsableHalfW = LANE_MAX * 0.9; // 벽 쪽 여유를 남기고 실제로 쓰는 폭(전 구간에서 안전한 범위)
+    const gridColSpacingNom = (gridUsableHalfW * 2) / gridCols;
+    const gridLaneJitter = Math.min(3, gridColSpacingNom * 0.15);
+    const gridRowGapNom = Math.max(30, gridColSpacingNom); // 줄 사이 간격(nominal) — 뒷줄일수록 더 뒤에서 출발
+    const gridProgressJitterNom = 3;
+    const slotOrder = karts.map((_, i) => i);
+    for (let i = slotOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slotOrder[i], slotOrder[j]] = [slotOrder[j], slotOrder[i]];
+    }
+    slotOrder.forEach((kartIdx, slot) => {
+      const col = slot % gridCols, row = Math.floor(slot / gridCols);
+      const k = karts[kartIdx];
+      k.lane = (gridCols === 1 ? 0 : -gridUsableHalfW + ((col + 0.5) / gridCols) * (gridUsableHalfW * 2)) + rFloat(-gridLaneJitter, gridLaneJitter);
+      k.progress = (-row * gridRowGapNom + rFloat(-gridProgressJitterNom, gridProgressJitterNom)) / trackTotalLen;
+    });
+    // 카운트다운 중엔 update()가 안 돌아서 sx/sy가 초기값(0,0=화면 좌상단)에 머무른다 —
+    // 만들자마자 출발선 위치를 한 번 계산해둬야 카운트다운 때도 출발선에 서 있는 것처럼 보인다.
+    for (const k of karts) {
+      const p = posAtScreen(k.progress, k.lane, k.branch);
+      k.sx = p.x; k.sy = p.y; k.angle = p.angle;
+    }
     projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
-    raceT = 0; firstFinishT = null; placesGiven = 0; nextPickupT = rFloat(1.5, 3);
+    lightningBolts = []; lightningCasts = []; fog = { t: 0, immune: null };
+    raceT = 0; firstFinishT = null; placesGiven = 0; nextPickupT = rFloat(1.25, 2.5); // 기존 대비 발생 빈도 20% 증가(간격을 1.2로 나눔)
+    postFinishCdLabel = null;
     state = "countdown"; cdStart = 0; cdLabel = "_";
     setupEl.style.display = "none";
     controls.hidden = false; hudEl.hidden = false;
     resultEl.classList.remove("show");
+    // 시작하자마자 뻔한 "N랩 남음"(총 랩수 그대로)이 뜨지 않도록, 처음 값과 같은 TOTAL_LAPS로 초기화해둔다 —
+    // 그래야 실제로 리더가 첫 바퀴를 돌아 랩수가 줄어들 때부터 팝업이 뜬다.
+    lastPopLaps = TOTAL_LAPS; lapPopEl.classList.remove("show");
     if (!rafId) loopStart();
   }
   function backToSetup() {
     state = "idle"; karts = []; projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
+    lightningBolts = []; lightningCasts = []; fog = { t: 0, immune: null };
     controls.hidden = true; hudEl.hidden = true;
     resultEl.classList.remove("show");
+    lapPopEl.classList.remove("show");
     cdEl.classList.remove("show"); cdEl.innerHTML = "";
     setupEl.style.display = "flex";
     stopLoop();
@@ -3684,57 +3867,140 @@ window.GameRecorder = (() => {
     }
     return out;
   }
+  // 현재 순위 1위(완주하지 않은 카트 중 가장 앞선 카트)를 찾는다 — 번개 아이템의 표적
+  function getRaceLeader() {
+    const pool = karts.filter(k => !k.finished);
+    if (!pool.length) return null;
+    return pool.reduce((best, k) => raceProgress(k) > raceProgress(best) ? k : best, pool[0]);
+  }
+  // 번개: 무적이면 완전히 무시하고, 아니면 잠깐 시꺼멓게 되며 스턴 — 큰 번개 줄기 + 화면 플래시 이펙트 동반
+  function strikeLightning(target) {
+    if (target.invincibleT > 0) return;
+    const dur = 1.6;
+    target.stunT = Math.max(target.stunT, dur);
+    target.lightningT = dur; // 스턴과 함께 감소 → 스턴 끝나면 시꺼먼 것도 같이 복구
+    target.wobble = 1; target.recentHit = 2.5;
+    const p = posAtScreen(target.progress, target.lane, target.branch);
+    lightningBolts.push({ x: p.x, y: p.y, life: 0.55 });
+    addFloat(p.x, p.y - 40, "⚡ 감전!", "#ffe14c");
+    addBurst(p.x, p.y, "#fff8c9", 26);
+    noiseSfx(0.26, 0.12, 3200); beep(1700, 0.05, "square", 0.06);
+    setTimeout(() => beep(90, 0.22, "sawtooth", 0.05, 30), 50);
+  }
   function useItem(kart) {
     const kind = kart.item;
     kart.item = null;
     const p = posAtScreen(kart.progress, kart.lane, kart.branch);
     if (kind === "fireball") {
-      projectiles.push({ owner: kart, progress: kart.progress, lane: kart.lane, life: 3.2 });
+      // 트랙 레일을 따라가지 않고, 발사 순간의 진행 방향으로 직진하는 자유 투사체.
+      // 벽(트랙 경계)에 부딪히면 완전탄성으로 계속 튕기다가, 카트를 맞히면 터지고
+      // 아무도 못 맞히면 수명이 다했을 때 그냥 사라진다.
+      const launch = trackPosAt(kart.progress, kart.lane, kart.branch); // nominal 좌표+각도
+      projectiles.push({
+        owner: kart, x: launch.x, y: launch.y,
+        vx: Math.cos(launch.angle) * FIREBALL_SPEED_NOM, vy: Math.sin(launch.angle) * FIREBALL_SPEED_NOM,
+        angle: launch.angle, life: 5,
+      });
       beep(1500, 0.09, "square", 0.045, 500);
       addFloat(p.x, p.y - 34, "🔥 발사!", "#e23c1f");
     } else if (kind === "boost") {
       kart.boostT = 2.6;
       beep(500, 0.16, "sawtooth", 0.05, 1400);
       addFloat(p.x, p.y - 34, "🚀 부스트!", "#ff9a3c");
+      addBurst(p.x, p.y, "#ff9a3c", 14);
     } else if (kind === "banana") {
       hazards.push({ kind: "banana", progress: kart.progress - 0.006, lane: kart.lane, owner: kart });
       beep(320, 0.08, "triangle", 0.04);
       addFloat(p.x, p.y - 34, "🍌 투척!", "#c99a1f");
     } else if (kind === "bomb") {
-      detonateBomb(kart);
+      // 그 자리에 두고 카운트다운하는 대신, 하늘로 슝 던져서 트랙 위 완전히 랜덤한 지점에
+      // 떨어져 쾅 터진다 — 날아가는 동안 점점 커졌다 착지 직전 다시 작아지는 포물선 연출(hazards에서 관리)
+      const startNom = trackPosAt(kart.progress, kart.lane, kart.branch);
+      const landBranch = Math.random() < 0.5 ? "A" : "B";
+      const landNom = trackPosAt(Math.random(), rFloat(-LANE_MAX, LANE_MAX), landBranch);
+      hazards.push({
+        kind: "bombfall", owner: kart, t: 0, dur: 0.9,
+        x0: startNom.x, y0: startNom.y, x1: landNom.x, y1: landNom.y,
+      });
+      beep(500, 0.35, "sine", 0.05, 1900); // 슝~ 하고 하늘로 던지는 상승 휘파람 소리
+      addFloat(p.x, p.y - 34, "💣 투척!", "#e23c1f");
     } else if (kind === "invincible") {
       kart.invincibleT = 3.4;
       beep(1200, 0.05, "sine", 0.04); setTimeout(() => beep(1600, 0.08, "sine", 0.04), 60);
       addFloat(p.x, p.y - 34, "✨ 무적!", "#0fb3b3");
+      addBurst(p.x, p.y, "#35f0e0", 16);
+    } else if (kind === "lightning") {
+      // 쓰자마자 바로 꽂히는 게 아니라: 사용 즉시 화면이 어두워지기 시작하고(폭풍 전야 느낌),
+      // 0.5초 뒤에 실제 번개가 내리꽂힌다. 표적(1위)은 쓰는 시점에 고정한다.
+      const leader = getRaceLeader();
+      if (leader) {
+        lightningCasts.push({ target: leader, armT: 0.5 });
+        noiseSfx(0.5, 0.14, 220); // 낮게 우르릉거리는 전조 소리
+      }
+    } else if (kind === "fog") {
+      fog.t = 5; fog.immune = kart;
+      beep(220, 0.3, "sine", 0.05);
+      noiseSfx(0.5, 0.18, 260);
+      addFloat(p.x, p.y - 34, "🌫️ 안개!", "#8fa0b8");
     }
   }
   function applyEffect(target, kind, fromAngle) {
     if (target.invincibleT > 0) return; // 무적: 모든 공격 무효
-    if (target.item === "bomb" && (kind === "fire" || kind === "bomb")) { detonateBomb(target); return; }
+    // 보유 중인 미사용 폭탄이 외부 충격(화염/다른 폭발)을 맞으면 그 자리에서 즉시 연쇄 폭발한다
+    if (target.item === "bomb" && (kind === "fire" || kind === "bomb")) {
+      target.item = null;
+      detonateBombAt(posAtScreen(target.progress, target.lane, target.branch), target);
+      return;
+    }
     const p = posAtScreen(target.progress, target.lane, target.branch);
     if (kind === "spin") {
       target.spinT = 1.1; target.wobble = 1;
       addFloat(p.x, p.y - 34, "😵 스핀!", "#c99a1f");
-    } else if (kind === "stun" || kind === "bomb" || kind === "fire") { // fire(파이어볼 직격)와 bomb(폭발 반경) 모두 동일한 스턴/넉백
-      target.stunT = 0.9; target.wobble = 1;
+    } else if (kind === "stun" || kind === "bomb" || kind === "fire") { // fire(파이어볼 직격)와 bomb(폭발 반경) 모두 동일 계열의 스턴/넉백, 다만 지속시간은 종류별로 다르게
+      const BASE_STUN = 0.9;
+      // 화염은 기존 대비 30% 더 길게, 폭탄은 20% 더 길게 정지시킨다(요청 반영)
+      const stunDur = kind === "fire" ? BASE_STUN * 1.3 : kind === "bomb" ? BASE_STUN * 1.2 : BASE_STUN;
+      target.stunT = stunDur; target.wobble = 1;
       target.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, target.lane + Math.cos(fromAngle || 0) * rFloat(-6, 6)));
-      addFloat(p.x, p.y - 34, "💫 스턴!", "#e23c1f");
+      if (kind === "fire") {
+        // 불덩이가 커진 만큼 명중 시 "펑" 하는 느낌도 훨씬 크게 — 파편/충격파 확대 + 효과음 강화 + 잠시 그을려서 까맣게
+        noiseSfx(0.22, 0.13, 850); beep(130, 0.16, "sawtooth", 0.06, 35);
+        setTimeout(() => beep(85, 0.18, "sawtooth", 0.05, 25), 45);
+        addFloat(p.x, p.y - 40, "🔥 명중!", "#e23c1f");
+        addBurst(p.x, p.y, "#ff9a3c", 42);
+        particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff6a1f", r0: 6, r1: 75 * TR.scale });
+        target.burnT = stunDur; // 스턴과 함께 사라짐 — 화상으로 잠시 까맣게 그을린 색이 됨
+      } else {
+        addFloat(p.x, p.y - 34, "💫 스턴!", "#e23c1f");
+        if (kind === "bomb") target.burnT = stunDur; // 폭탄에 맞아도 스턴 동안 잠시 까맣게 그을린다(번개/화염과 동일)
+      }
     }
     target.recentHit = 2.5;
     addBurst(p.x, p.y, target.color, 10);
   }
-  function detonateBomb(kart) {
-    kart.item = null;
-    const p = posAtScreen(kart.progress, kart.lane, kart.branch);
-    noiseSfx(0.22, 0.1, 700); beep(90, 0.22, "sine", 0.05, 40);
-    addBurst(p.x, p.y, "#f2a900", 24);
-    addFloat(p.x, p.y - 36, "💥 펑!", "#e23c1f");
+  const BOMB_RADIUS_NOM = 225; // 폭탄 폭발 반경(nominal 단위) — 기존(150) 대비 1.5배로 확대
+  // 폭탄은 이제 "쓰자마자 즉시 터지는" 게 아니라, 그 자리에 내려놓고 3초 뒤에 쾅 터진다(hazards에서 처리).
+  // 이 함수는 실제 폭발 순간에만 호출된다 — 화면좌표(p)를 직접 받아서, 설치 당시 위치에서 터지게 한다
+  // (호출 시점엔 놓은 사람이 이미 다른 곳으로 이동해 있을 수 있으므로 kart 위치를 다시 읽지 않는다).
+  function detonateBombAt(p, owner) {
+    // 훨씬 화려한 다단 폭발 연출: 밝은 플래시 + 색이 다른 파편 여러 겹 + 두 겹의 팽창 충격파(살짝 시차를 둬서 이중 타격감)
+    noiseSfx(0.4, 0.22, 350); beep(55, 0.38, "sine", 0.07, 16);
+    setTimeout(() => beep(220, 0.14, "square", 0.05), 100); // 잔향 비프로 한 번 더 임팩트
+    particles.push({ type: "flash", x: p.x, y: p.y, life: 1, r1: BOMB_RADIUS_NOM * TR.scale * 0.7 });
+    addBurst(p.x, p.y, "#fff8c9", 22); // 밝은 중심 파편
+    addBurst(p.x, p.y, "#ffcf4d", 44); // 기존 주황 파편(확대)
+    addBurst(p.x, p.y, "#ff5a1f", 32); // 진한 빨강 파편
+    addBurst(p.x, p.y, "#3a3a3a", 14); // 검댕/스모크로 대비 강조
+    particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ff7a1f", r0: 10, r1: BOMB_RADIUS_NOM * TR.scale });
+    setTimeout(() => { // 조금 늦게 퍼지는 두 번째 충격파 — 한 번에 끝나지 않고 겹쳐 터지는 느낌
+      particles.push({ type: "ring", x: p.x, y: p.y, life: 1, color: "#ffdb7a", r0: 6, r1: BOMB_RADIUS_NOM * TR.scale * 0.65 });
+    }, 140);
+    addFloat(p.x, p.y - 42, "💥💥 콰쾅!", "#e23c1f");
     for (const o of karts) {
-      if (o === kart || o.finished) continue;
+      if (o.finished) continue;
       const op = posAtScreen(o.progress, o.lane, o.branch);
-      if (Math.hypot(op.x - p.x, op.y - p.y) < 70 * TR.scale) applyEffect(o, "bomb", 0);
+      if (Math.hypot(op.x - p.x, op.y - p.y) < BOMB_RADIUS_NOM * TR.scale) applyEffect(o, "bomb", 0);
     }
-    applyEffect(kart, "bomb", 0); // 사용자 본인도 폭발 반경 안 — 스스로도 잠깐 스턴
   }
 
   function decideItemUse(kart, dt) {
@@ -3755,6 +4021,11 @@ window.GameRecorder = (() => {
       if (near.some(n => !n.ahead) || held > 5) useItem(kart);
     } else if (kart.item === "invincible") {
       if (near.length || held > 4) useItem(kart);
+    } else if (kart.item === "lightning") {
+      // 이미 자기가 1등이면 자기 자신에게 꽂혀 의미가 없으니 쓰지 않는다
+      if (getRaceLeader() !== kart && held > 1) useItem(kart);
+    } else if (kart.item === "fog") {
+      if (near.length || held > 3) useItem(kart);
     }
   }
 
@@ -3764,7 +4035,17 @@ window.GameRecorder = (() => {
     raceT += ds;
 
     nextPickupT -= ds;
-    if (nextPickupT <= 0) { spawnPickup(); nextPickupT = rFloat(1.8, 3.4); }
+    if (nextPickupT <= 0) { spawnPickup(); nextPickupT = rFloat(1.5, 2.83); } // 기존 대비 발생 빈도 20% 증가(간격을 1.2로 나눔)
+
+    if (fog.t > 0) { fog.t -= ds; if (fog.t <= 0) fog.immune = null; }
+    for (const lb of lightningBolts) lb.life -= ds * 1.8;
+    lightningBolts = lightningBolts.filter(lb => lb.life > 0);
+    // 번개 예고 — 화면은 이미 어두워지는 중이고, 0.5초가 다 되면 그제서야 실제로 내리꽂힌다
+    for (const lc of lightningCasts) {
+      lc.armT -= ds;
+      if (lc.armT <= 0) { strikeLightning(lc.target); lc.hit = true; }
+    }
+    lightningCasts = lightningCasts.filter(lc => !lc.hit);
 
     for (const kart of karts) {
       if (kart.wobble > 0) kart.wobble -= ds * 1.6;
@@ -3775,9 +4056,26 @@ window.GameRecorder = (() => {
       if (kart.stunT > 0) kart.stunT -= ds;
       if (kart.spinT > 0) kart.spinT -= ds;
       if (kart.invincibleT > 0) kart.invincibleT -= ds;
+      if (kart.impactT > 0) kart.impactT -= ds;
+      if (kart.lightningT > 0) kart.lightningT -= ds; // 스턴과 나란히 감소 → 스턴 끝날 때 시꺼먼 것도 복구
+      if (kart.burnT > 0) kart.burnT -= ds; // 화염 직격 그을림도 마찬가지로 잠시 후 복구
+      if ((kart.lightningT > 0 || kart.burnT > 0) && Math.random() < 0.5) {
+        // 몸체 색만 바꾸면 화면상 작은 카트에서는 잘 안 보이므로, 위로 피어오르는 그을음 연기를 더해
+        // "지금 이 카트가 타고 있다"는 게 멀리서도 눈에 띄게 한다.
+        particles.push({ type: "dust", x: kart.sx + rFloat(-6, 6), y: kart.sy - 6,
+          vx: rFloat(-0.2, 0.2), vy: rFloat(-1.1, -0.7), life: 1, color: "#5a5550" });
+      }
 
-      const mult = (kart.stunT > 0 ? 0.16 : 1) * (kart.spinT > 0 ? 0.28 : 1) * (kart.boostT > 0 ? 1.85 : 1);
-      kart.progress += kart.speedNoise * mult * LAPS_PER_SEC_BASE * ds;
+      // 아이템 효과(스턴/스핀/부스트)는 기존처럼 즉각 반영되는 이벤트성 배율.
+      const eventMult = (kart.stunT > 0 ? 0.16 : 1) * (kart.spinT > 0 ? 0.28 : 1) * (kart.boostT > 0 ? 1.85 : 1);
+      // 안개: 안개를 쓴 카트 본인은 영향 없고, 나머지 전원은 앞이 안 보여 느려진다(기존 20%에서 10%p 추가)
+      const fogSlow = (fog.t > 0 && kart !== fog.immune) ? 0.7 : 1;
+      // "주행 감각"(커브 감속 + 충돌 직후 감속 + 직진에서 최고속도로 서서히 가속)은 관성을 둬서
+      // 목표치로 서서히 수렴시킨다 — 감속은 빠르게 반응하고, 가속은 완만하게 붙는다.
+      const targetDrive = curveFactorAt(kart.progress, kart.branch) * (kart.impactT > 0 ? 0.62 : 1) * fogSlow;
+      const rate = targetDrive < kart.driveMult ? 6 : 2.2;
+      kart.driveMult += (targetDrive - kart.driveMult) * Math.min(1, rate * ds);
+      kart.progress += kart.speedNoise * kart.driveMult * eventMult * LAPS_PER_SEC_BASE * ds;
 
       // 분기 진입 시 이번 랩의 분기 선택을 한 번만 굴린다
       const fracNow = ((kart.progress % 1) + 1) % 1;
@@ -3790,7 +4088,7 @@ window.GameRecorder = (() => {
       if (curLap > kart.lap) {
         kart.lap = curLap;
         if (kart.lap >= TOTAL_LAPS) {
-          kart.finished = true; kart.place = ++placesGiven;
+          kart.finished = true; kart.place = ++placesGiven; kart.finishTime = raceT; // 실제로 결승선을 통과한 기록(강제완주자는 null로 남음)
           if (firstFinishT === null) {
             firstFinishT = raceT;
             beep(880, 0.1); setTimeout(() => beep(1175, 0.12), 110); setTimeout(() => beep(1568, 0.2), 240);
@@ -3803,36 +4101,90 @@ window.GameRecorder = (() => {
 
       const p = posAtScreen(kart.progress, kart.lane, kart.branch);
       kart.sx = p.x; kart.sy = p.y; kart.angle = p.angle;
+
+      if (kart.boostT > 0 && Math.random() < 0.6) { // 부스트 중 뒤로 흩날리는 잔상 트레일
+        const back = kart.angle + Math.PI;
+        particles.push({ type: "dust", x: p.x + Math.cos(back) * 14, y: p.y + Math.sin(back) * 14,
+          vx: Math.cos(back) * rFloat(0.5, 1.4), vy: Math.sin(back) * rFloat(0.5, 1.4), life: 1,
+          color: Math.random() < 0.5 ? "#ff9a3c" : "#ffd23c" });
+      }
     }
 
-    // 카트-카트 물리 충돌 (겹치지 않도록 좌우로 밀어내기)
+    // 카트-카트 물리 충돌 — 화면상 실제 거리로 감지한다(분기에서 서로 다른 갈래를 탄 카트는
+    // 실제로 멀리 떨어져 있으니 자연히 무시됨 — progress/lane만으로 근접을 재면 분기점 부근에서
+    // 서로 다른 갈래인데도 "충돌"로 오판해 카트가 순간이동한 것처럼 튀는 버그가 있었다).
+    // 카트 A의 진행방향 기준 좌표계로 충돌 법선을 분해해서 앞뒤 충돌은 진행률(progress) 축으로,
+    // 옆 충돌은 레인(lane) 축으로 튕겨나가게 하고, 무적 상태는 판정 자체를 건너뛰어 완전히
+    // 뚫고 지나간다(어느 한쪽이 무적이면 서로에게 아무 영향도 주지 않음).
     const active = karts.filter(k => !k.finished);
     for (let i = 0; i < active.length; i++) {
       for (let j = i + 1; j < active.length; j++) {
         const a = active[i], b = active[j];
-        const dist = Math.hypot(a.sx - b.sx, a.sy - b.sy);
+        if (a.invincibleT > 0 || b.invincibleT > 0) continue;
+        const dxScreen = b.sx - a.sx, dyScreen = b.sy - a.sy;
+        const distScreen = Math.hypot(dxScreen, dyScreen);
         const threshold = COLLIDE_DIST_NOM * TR.scale;
-        if (dist < threshold && dist > 0.01) {
-          const push = (threshold - dist) / threshold;
-          const dir = a.lane <= b.lane ? -1 : 1;
-          if (a.invincibleT <= 0) a.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, a.lane + dir * push * 5));
-          if (b.invincibleT <= 0) b.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, b.lane - dir * push * 5));
-          sfxThrottle("kt-bump", 90, () => beep(200, 0.05, "square", 0.03));
-          if (a.invincibleT <= 0 && b.invincibleT <= 0) { a.stunT = Math.max(a.stunT, 0.12); b.stunT = Math.max(b.stunT, 0.12); }
+        if (distScreen < threshold && distScreen > 0.5) {
+          const ang = a.angle;
+          const tx = Math.cos(ang), ty = Math.sin(ang); // 진행(접선) 방향
+          const nx = -Math.sin(ang), ny = Math.cos(ang); // 레인(법선) 방향
+          const distNom = distScreen / TR.scale;
+          const ux = (dxScreen * tx + dyScreen * ty) / TR.scale / distNom; // a→b, 진행축 성분(단위벡터)
+          const uy = (dxScreen * nx + dyScreen * ny) / TR.scale / distNom; // a→b, 레인축 성분(단위벡터)
+          // 겹침 해소분에 더해 "튕겨나가는" 추가 충격을 얹어 더 확실한 충돌감을 준다
+          const overlap = (COLLIDE_DIST_NOM - distNom) * 0.5 + COLLIDE_DIST_NOM * 0.35;
+          a.progress -= ux * overlap / trackTotalLen;
+          a.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, a.lane - uy * overlap));
+          a.impactT = Math.max(a.impactT, 0.45); a.wobble = Math.max(a.wobble, 0.5);
+          b.progress += ux * overlap / trackTotalLen;
+          b.lane = Math.max(-LANE_MAX, Math.min(LANE_MAX, b.lane + uy * overlap));
+          b.impactT = Math.max(b.impactT, 0.45); b.wobble = Math.max(b.wobble, 0.5);
+          addBurst((a.sx + b.sx) / 2, (a.sy + b.sy) / 2, "#fff", 7);
+          sfxThrottle("kt-bump", 90, () => beep(150, 0.08, "square", 0.045));
         }
       }
     }
 
-    // 투사체(파이어볼) 이동/충돌
+    // 투사체(파이어볼) 이동/충돌 — 레일을 따라가지 않고 직선으로 날아가다 트랙 벽에 완전탄성으로 튕긴다
     for (const pr of projectiles) {
-      pr.life -= ds; pr.progress += 0.62 * ds; // 카트보다 훨씬 빠르게 전진
-      const pp = posAtScreen(pr.progress, pr.lane, pr.owner.branch);
+      pr.life -= ds;
+      pr.x += pr.vx * ds; pr.y += pr.vy * ds; // nominal 공간에서 순수 직선 운동
+
+      // 가장 가까운 트랙 중심선 점을 찾아, 그 지점의 반폭(halfW)을 넘어섰으면 벽에 닿은 것으로 보고
+      // 벽 바깥쪽(중심선→현재위치) 방향을 법선 삼아 속도를 반사한다 — 속력은 그대로 유지되는 완전탄성 충돌.
+      let nearest = null, nearestDist = Infinity;
+      for (const wp of trackWallPts) {
+        const d = (pr.x - wp.x) * (pr.x - wp.x) + (pr.y - wp.y) * (pr.y - wp.y);
+        if (d < nearestDist) { nearestDist = d; nearest = wp; }
+      }
+      nearestDist = Math.sqrt(nearestDist);
+      if (nearest && nearestDist > nearest.halfW) {
+        const nx = (pr.x - nearest.x) / nearestDist, ny = (pr.y - nearest.y) / nearestDist;
+        const dot = pr.vx * nx + pr.vy * ny;
+        if (dot > 0) {
+          pr.vx -= 2 * dot * nx; pr.vy -= 2 * dot * ny;
+          pr.angle = Math.atan2(pr.vy, pr.vx);
+          const bp = toScreen(pr.x, pr.y);
+          addBurst(bp.x, bp.y, "#ffcf4d", 6); // 튕기는 순간 스파크
+          sfxThrottle("kt-firewall", 70, () => beep(500, 0.05, "square", 0.03));
+        }
+        // 경계 바로 안쪽으로 밀어넣어 벽에 박혀 매 프레임 반사되는 것을 방지
+        pr.x = nearest.x + nx * nearest.halfW * 0.96;
+        pr.y = nearest.y + ny * nearest.halfW * 0.96;
+      }
+
+      const pp = toScreen(pr.x, pr.y);
       pr.sx = pp.x; pr.sy = pp.y;
+      if (Math.random() < 0.7) { // 날아가는 동안 뒤로 흩날리는 불티 트레일 — 커진 불덩이 크기에 맞춰 존재감 강화
+        particles.push({ type: "dust", x: pp.x + rFloat(-4, 4), y: pp.y + rFloat(-4, 4),
+          vx: rFloat(-0.3, 0.3), vy: rFloat(-0.3, 0.3), life: 1,
+          color: Math.random() < 0.5 ? "#ff9a3c" : "#ffe14c" });
+      }
       for (const k of karts) {
         if (k === pr.owner || k.finished) continue;
         const kp = posAtScreen(k.progress, k.lane, k.branch);
-        if (Math.hypot(kp.x - pp.x, kp.y - pp.y) < 22 * TR.scale) {
-          applyEffect(k, "fire", pp.angle);
+        if (Math.hypot(kp.x - pp.x, kp.y - pp.y) < 32 * TR.scale) { // 불덩이가 커진 만큼 피격판정도 넓힘
+          applyEffect(k, "fire", pr.angle);
           beep(180, 0.1, "sawtooth", 0.05);
           pr.life = -1;
           break;
@@ -3841,10 +4193,24 @@ window.GameRecorder = (() => {
     }
     projectiles = projectiles.filter(pr => pr.life > 0);
 
-    // 바나나(장애물) — 지나가는 카트가 밟으면 스핀
+    // 장애물 처리: 바나나(지나가는 카트가 밟으면 스핀) + 폭탄(하늘로 던져져 포물선을 그리다 랜덤 지점에 착지해 쾅 폭발)
     for (const hz of hazards) {
       if (hz.hit) continue;
-      const hp = posAtScreen(hz.progress, hz.lane, hz.owner.branch);
+      if (hz.kind === "bombfall") {
+        hz.t += ds;
+        const frac = Math.min(1, hz.t / hz.dur);
+        const curX = hz.x0 + (hz.x1 - hz.x0) * frac;
+        const curY = hz.y0 + (hz.y1 - hz.y0) * frac;
+        hz.heightFrac = Math.sin(Math.PI * frac); // 0→1→0, 포물선 높이(시각효과용)
+        const sp = toScreen(curX, curY);
+        hz.sx = sp.x; hz.sy = sp.y;
+        if (frac >= 1) {
+          detonateBombAt(sp, hz.owner);
+          hz.hit = true;
+        }
+        continue;
+      }
+      const hp = posAtScreen(hz.progress, hz.lane, hz.branch || hz.owner.branch);
       hz.sx = hp.x; hz.sy = hp.y;
       for (const k of karts) {
         if (k === hz.owner || k.finished) continue;
@@ -3881,17 +4247,36 @@ window.GameRecorder = (() => {
 
     for (const p of particles) {
       if (p.type === "txt") { p.y += p.vy; p.life -= 0.014; }
+      else if (p.type === "ring") { p.life -= 0.03; }
+      else if (p.type === "flash") { p.life -= 0.09; } // 폭발 순간 밝은 플래시 — 빠르게 사라짐
       else { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life -= 0.045; }
     }
     particles = particles.filter(p => p.life > 0);
     for (const c of confetti) { c.x += c.vx; c.y += c.vy; c.vy += 0.12; c.rot += c.vr; c.life -= 0.006; }
     confetti = confetti.filter(c => c.life > 0 && c.y < H + 30);
 
-    if (state === "racing" && firstFinishT !== null && raceT - firstFinishT > 12) {
-      // 남은 카트는 실제 진행률(랩+구간진행) 내림차순으로 등수를 매긴다 (배열 순서로 매기면 순위가 왜곡됨)
-      [...karts].filter(k => !k.finished)
-        .sort((a, b) => raceProgress(b) - raceProgress(a))
-        .forEach(k => { k.finished = true; k.place = ++placesGiven; });
+    if (state === "racing" && firstFinishT !== null) {
+      // 1등 골인 직후엔 다른 연출(컨페티·팡파레)과 겹쳐 보이지 않도록 1초 조용히 쉬었다가,
+      // 그 다음 9초 카운트다운을 보여준다(합쳐서 총 대기시간은 그대로 10초).
+      const elapsed = raceT - firstFinishT;
+      const PAUSE = 1, COUNT = 9;
+      let label = "";
+      if (elapsed >= PAUSE) {
+        const remain = COUNT - (elapsed - PAUSE);
+        label = remain > 0 ? String(Math.ceil(remain)) : "";
+      }
+      if (label !== postFinishCdLabel) {
+        postFinishCdLabel = label;
+        showFinishCd(label);
+        if (label) beep(Number(label) <= 3 ? 900 : 640, 0.07, "square", 0.045);
+      }
+      if (elapsed >= PAUSE + COUNT) {
+        showFinishCd("");
+        // 남은 카트는 실제 진행률(랩+구간진행) 내림차순으로 등수를 매긴다 (배열 순서로 매기면 순위가 왜곡됨)
+        [...karts].filter(k => !k.finished)
+          .sort((a, b) => raceProgress(b) - raceProgress(a))
+          .forEach(k => { k.finished = true; k.place = ++placesGiven; });
+      }
     }
     if (state === "racing" && karts.length && karts.every(k => k.finished)) {
       state = "done";
@@ -3907,13 +4292,21 @@ window.GameRecorder = (() => {
     }
   }
 
+  // 초 단위 레이스 기록을 "M분 SS.xx초"로 표시(소수 둘째 자리까지) — 강제완주자는 finishTime이
+  // null이라 호출되지 않음
+  function formatRaceTime(sec) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return `${m}분 ${s.toFixed(2).padStart(5, "0")}초`;
+  }
   function showResults() {
     if (window.BGM) { BGM.stop(); BGM.start("victory"); BGM.fanfare(); }
     const order = [...karts].sort((a, b) => a.place - b.place);
     resultList.innerHTML = order.map(k => {
       const gold = k.place === 1 ? " gold" : "";
+      const timeBadge = k.finishTime != null ? `<span class="wtime">${formatRaceTime(k.finishTime)}</span>` : "";
       return `<div class="wrow${gold}"><span class="wrank">${k.place}등</span>` +
         `<span class="wname" style="color:${k.color}">${escapeHtml(k.name)}</span>` +
+        timeBadge +
         `<span class="wweap">${k.place === 1 ? "🏆" : k.place === 2 ? "🥈" : k.place === 3 ? "🥉" : ""}</span></div>`;
     }).join("");
     resultEl.classList.add("show");
@@ -3921,13 +4314,14 @@ window.GameRecorder = (() => {
   }
 
   // ================= 렌더링 =================
-  function roundRect(x, y, w, h, r) {
+  // g(그래픽 컨텍스트)를 인자로 받는다 — 트랙은 오프스크린 캐시(tctx)에, 나머지는 메인 ctx에 그리기 때문.
+  function roundRect(g, x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2);
-    ctx.beginPath(); ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    g.beginPath(); g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r); g.closePath();
   }
   function clipText(text, maxW) {
     if (ctx.measureText(text).width <= maxW) return text;
@@ -3936,72 +4330,85 @@ window.GameRecorder = (() => {
     return t.length ? t + "…" : "";
   }
 
-  // 도로면 색: 본선은 흰색, 분기 두 갈래는 서로 다른 색으로 칠해 "여기서 갈린다"가 지도만 보고도 뚜렷하게 보이게 한다
-  const ROAD_FILL = { mainA: "rgba(255,255,255,.86)", mainB: "rgba(255,255,255,.86)",
-    forkA: "rgba(160,210,255,.9)", forkB: "rgba(255,196,140,.9)" };
+  // 도로면 색: 진한 회색 아스팔트 톤 — 하얀 도로 위에서는 폭발/번개/부스트 같은 밝은 이펙트가
+  // 묻혀 보였는데, 어둡게 깔면 그 위에서 확 도드라져 보인다. 분기 두 갈래는 각자의 톤(청/주황)을
+  // 유지하되 같이 어둡게 낮춰서 "여기서 갈린다"는 구분은 유지한다.
+  // 불투명 채색: 도로 폭이 넓어 겹침이 많아졌는데, 반투명이면 겹친 자리(라운드 캡, 시케인)가 얼룩져 보인다
+  const ROAD_FILL = { mainA: "#6e7279", mainB: "#6e7279",
+    forkA: "#7d91a2", forkB: "#a28b75" }; // 전체 도로 색을 한 번 더 20%씩 밝게(흰색 쪽으로 보정)
 
-  function drawTrack() {
+  // mainA는 첫 구간(넓게)/분기 전 구간(좁게)로 폭이 달라 통짜 Path2D 하나를 굵게 긋는 방식으로는
+  // 표현할 수 없다. LUT 점 사이를 잘게 나눠 구간마다 다른 lineWidth로 그어서 폭 변화를 구현한다.
+  function strokeMainAVariable(g, extraW, color) {
+    g.strokeStyle = color;
+    const pts = mainALUT.pts, cum = mainALUT.cum, total = mainALUT.total;
+    for (let i = 1; i < pts.length; i++) {
+      const frac = ((cum[i - 1] + cum[i]) / 2) / total;
+      g.lineWidth = mainAHalfWidthAt(frac) * 2 * TR.scale + extraW;
+      const p0 = toScreen(pts[i - 1].x, pts[i - 1].y);
+      const p1 = toScreen(pts[i].x, pts[i].y);
+      g.beginPath(); g.moveTo(p0.x, p0.y); g.lineTo(p1.x, p1.y); g.stroke();
+    }
+  }
+
+  function renderTrackInto(g) {
     if (!trackPaths) return;
     const roadW = TRACK_HALF_W_NOM * 2 * TR.scale;
-    ctx.save();
-    ctx.lineJoin = "round"; ctx.lineCap = "round";
-    // 어두운 테두리 먼저, 그 위에 도로면(분기 구간은 갈래별로 색을 다르게)
-    for (const key of ["mainA", "forkA", "forkB", "mainB"]) {
-      ctx.lineWidth = roadW + 7; ctx.strokeStyle = "#1c2030"; ctx.stroke(trackPaths[key]);
+    g.save();
+    g.lineJoin = "round"; g.lineCap = "round";
+    // 어두운 테두리 먼저, 그 위에 도로면(분기 구간은 갈래별로 색을 다르게).
+    // 본선을 먼저 칠하고 분기를 나중에 칠해야 분기점/합류점에서 분기 색이
+    // 본선 위로 자연스럽게 흘러들어간다 (반대 순서면 본선 라운드 캡이 분기 위에 흰 원반으로 뜬다)
+    strokeMainAVariable(g, 7, "#1c2030");
+    for (const key of ["mainB", "forkA", "forkB"]) {
+      g.lineWidth = roadW + 7; g.strokeStyle = "#1c2030"; g.stroke(trackPaths[key]);
     }
-    for (const key of ["mainA", "forkA", "forkB", "mainB"]) {
-      ctx.lineWidth = roadW; ctx.strokeStyle = ROAD_FILL[key]; ctx.stroke(trackPaths[key]);
+    strokeMainAVariable(g, 0, ROAD_FILL.mainA);
+    for (const key of ["mainB", "forkA", "forkB"]) {
+      g.lineWidth = roadW; g.strokeStyle = ROAD_FILL[key]; g.stroke(trackPaths[key]);
     }
-    // 중앙 점선
-    ctx.setLineDash([10, 12]); ctx.lineWidth = 2; ctx.strokeStyle = "rgba(28,32,48,.22)";
-    for (const key of ["mainA", "forkA", "forkB", "mainB"]) ctx.stroke(trackPaths[key]);
-    ctx.setLineDash([]);
-    ctx.restore();
+    // 중앙 점선 — 도로가 어두워졌으니 밝은 선으로 바꿔 계속 보이게 한다
+    g.setLineDash([10, 12]); g.lineWidth = 2; g.strokeStyle = "rgba(255,255,255,.3)";
+    for (const key of ["mainA", "forkA", "forkB", "mainB"]) g.stroke(trackPaths[key]);
+    g.setLineDash([]);
+    g.restore();
 
-    // 출발/결승선 (체크무늬) — mainA 시작점 부근
+    // 출발/결승선 (체크무늬) — mainA 시작점 부근, 20% 넓어진 첫 구간 폭에 맞춘다
+    const startHalfW = mainAHalfWidthAt(0) * TR.scale;
     const startP = posAtScreen(0, 0, "A");
     const dirP = posAtScreen(0.006, 0, "A");
     const ang = Math.atan2(dirP.y - startP.y, dirP.x - startP.x);
-    ctx.save();
-    ctx.translate(startP.x, startP.y); ctx.rotate(ang + Math.PI / 2);
-    const half = roadW / 2;
+    g.save();
+    // rotate(ang)만 줘야 체크무늬의 긴 축(-halfW~halfW)이 레인(도로 폭) 방향으로 눕는다.
+    // (+Math.PI/2를 더하면 긴 축이 진행방향으로 누워버려 결승선이 가로로 그려진다)
+    g.translate(startP.x, startP.y); g.rotate(ang);
     for (let i = -1; i <= 1; i += 2) {
-      for (let s = -half; s < half; s += 8) {
-        ctx.fillStyle = (Math.floor((s + half) / 8) % 2 === 0) ? "#1c2030" : "#fff";
-        ctx.fillRect(i * 4, s, 4, 8);
+      for (let s = -startHalfW; s < startHalfW; s += 8) {
+        g.fillStyle = (Math.floor((s + startHalfW) / 8) % 2 === 0) ? "#1c2030" : "#fff";
+        g.fillRect(i * 4, s, 4, 8);
       }
     }
-    ctx.restore();
-    ctx.save();
-    ctx.font = "900 12px system-ui,sans-serif"; ctx.fillStyle = "#1c2030"; ctx.textAlign = "center";
-    ctx.fillText("🏁 START/FINISH", startP.x, startP.y - roadW / 2 - 10);
-    ctx.restore();
+    g.restore();
+    g.save();
+    g.font = "900 12px system-ui,sans-serif"; g.fillStyle = "#1c2030"; g.textAlign = "center";
+    g.fillText("🏁 START/FINISH", startP.x, startP.y - startHalfW - 10);
+    g.restore();
+  }
 
-    // 분기/합류 지점 큰 표시
-    const forkOutP = posAtScreen(FORK_START, 0, "A");
-    const forkInP = posAtScreen(FORK_END, 0, "A");
-    ctx.save();
-    ctx.font = "900 15px system-ui,sans-serif"; ctx.fillStyle = "#1c2030"; ctx.textAlign = "center";
-    ctx.fillText("⑂ 분기점", forkOutP.x, forkOutP.y - roadW / 2 - 14);
-    ctx.fillText("⑃ 합류점", forkInP.x, forkInP.y - roadW / 2 - 14);
-    ctx.restore();
+  function renderTrackCache() {
+    trackCacheCanvas.width = canvas.width;
+    trackCacheCanvas.height = canvas.height;
+    tctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    renderTrackInto(tctx);
+  }
 
-    // 갈래별 성격 라벨: 각 분기 경로의 중간 지점 위에 색이 같은 배지로 표시
-    const mid = FORK_START + (FORK_END - FORK_START) * 0.5;
-    const aMid = posAtScreen(mid, 0, "A"), bMid = posAtScreen(mid, 0, "B");
-    function branchLabel(p, text, color) {
-      ctx.save();
-      ctx.font = "900 12px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      const tw = ctx.measureText(text).width, bw = tw + 16, bh = 22;
-      const by = p.y - roadW / 2 - 16;
-      roundRect(p.x - bw / 2, by - bh / 2, bw, bh, 8);
-      ctx.fillStyle = "#fff"; ctx.fill();
-      ctx.lineWidth = 2.4; ctx.strokeStyle = color; ctx.stroke();
-      ctx.fillStyle = color; ctx.fillText(text, p.x, by + 1);
-      ctx.restore();
-    }
-    branchLabel(aMid, "🛣️ 직선 급행 (길다)", "#1f7ae0");
-    branchLabel(bMid, "🌀 숏컷 (짧다)", "#e0791f");
+  // 실제 프레임에서는 매번 다시 그리지 않고 리사이즈 때 미리 그려둔 이미지를 그대로 복사한다.
+  function drawTrack() {
+    if (!trackCacheCanvas.width) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // 캐시는 이미 DPR까지 반영된 raw 픽셀이라 1:1로 복사
+    ctx.drawImage(trackCacheCanvas, 0, 0);
+    ctx.restore();
   }
 
   // 졸라맨이 카트를 모는 탑뷰 실루엣. 진행방향(+x)을 향해 그리며, 사람은 위에서 보이는
@@ -4017,10 +4424,37 @@ window.GameRecorder = (() => {
     ctx.scale(s, s);
 
     if (k.invincibleT > 0) {
-      ctx.save(); ctx.globalAlpha = 0.4 + Math.sin(raceT * 14) * 0.2;
-      ctx.strokeStyle = "#35f0e0"; ctx.lineWidth = 3.5;
+      // 슈퍼마리오 별 무적처럼 무지개색으로 빠르게 색이 바뀌는 링 + 궤도 별
+      ctx.save(); ctx.globalAlpha = 0.55 + Math.sin(raceT * 14) * 0.2;
+      const hue1 = (raceT * 340) % 360, hue2 = (raceT * 340 + 60) % 360;
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = `hsl(${hue1},95%,62%)`;
       ctx.beginPath(); ctx.arc(-2, 0, 25, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = `hsl(${hue2},95%,62%)`;
       ctx.beginPath(); ctx.arc(-2, 0, 20, 0, Math.PI * 2); ctx.stroke();
+      // 주변을 도는 반짝이는 별들 — 별마다 다른 색으로 무지개처럼
+      ctx.font = "10px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let i = 0; i < 3; i++) {
+        const a = raceT * 3.2 + (i * Math.PI * 2) / 3;
+        const hue = (raceT * 340 + i * 120) % 360;
+        ctx.save(); ctx.globalAlpha = 0.9;
+        ctx.translate(-2 + Math.cos(a) * 24, Math.sin(a) * 24);
+        ctx.shadowColor = `hsl(${hue},95%,65%)`; ctx.shadowBlur = 6;
+        ctx.fillStyle = `hsl(${hue},95%,65%)`;
+        ctx.fillText("★", 0, 0);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+    if (k.spinT > 0) {
+      // 어질어질한 별이 머리 위를 빙빙 도는 효과
+      ctx.save(); ctx.font = "11px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let i = 0; i < 3; i++) {
+        const a = raceT * 9 + (i * Math.PI * 2) / 3;
+        ctx.save(); ctx.translate(-3 + Math.cos(a) * 13, -18 + Math.sin(a) * 5);
+        ctx.fillText("💫", 0, 0);
+        ctx.restore();
+      }
       ctx.restore();
     }
     if (k.boostT > 0) {
@@ -4047,12 +4481,27 @@ window.GameRecorder = (() => {
     ctx.beginPath(); ctx.arc(-12, 10, 5, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(9, 10, 5, 0, Math.PI * 2); ctx.fill();
 
-    // 카트 차체(낮은 좌석) + 앞 코
-    ctx.fillStyle = k.color;
-    roundRect(-16, -8, 28, 16, 6); ctx.fill();
-    ctx.lineWidth = 2.4; ctx.strokeStyle = "#1c2030"; roundRect(-16, -8, 28, 16, 6); ctx.stroke();
+    // 카트 차체(낮은 좌석) + 앞 코 — 번개에 맞으면 새까맣게, 화염에 맞으면 그을린 색으로,
+    // 무적일 땐 마리오 별처럼 무지개색으로 빠르게 깜빡이는 색으로(모두 끝나면 원래 색 복구)
+    const bodyColor = k.lightningT > 0 ? "#20202a"
+      : k.burnT > 0 ? "#2b2320"
+      : k.invincibleT > 0 ? `hsl(${(raceT * 480) % 360},90%,58%)` : k.color;
+    ctx.fillStyle = bodyColor;
+    roundRect(ctx, -16, -8, 28, 16, 6); ctx.fill();
+    ctx.lineWidth = 2.4; ctx.strokeStyle = "#1c2030"; roundRect(ctx, -16, -8, 28, 16, 6); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(12, -8); ctx.lineTo(21, 0); ctx.lineTo(12, 8); ctx.closePath();
-    ctx.fillStyle = k.color; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = "#1c2030"; ctx.stroke();
+    ctx.fillStyle = bodyColor; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = "#1c2030"; ctx.stroke();
+    if (k.lightningT > 0) {
+      // 지지직 스파크: 몸체 주변에 짧게 튀는 노란 선
+      ctx.save(); ctx.globalAlpha = 0.6 + Math.sin(raceT * 40) * 0.4;
+      ctx.strokeStyle = "#ffe14c"; ctx.lineWidth = 1.6;
+      for (let i = 0; i < 3; i++) {
+        const a = Math.random() * Math.PI * 2, r1 = 10 + Math.random() * 4, r2 = r1 + 5 + Math.random() * 5;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1); ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // 졸라맨 운전자: 팔로 핸들 잡기 (탑뷰라 몸통은 카트 안에 가려짐)
     ctx.strokeStyle = "#1c2030"; ctx.lineWidth = 3; ctx.lineCap = "round";
@@ -4062,13 +4511,18 @@ window.GameRecorder = (() => {
     ctx.stroke();
     ctx.beginPath(); ctx.arc(11, 0, 4.2, 0, Math.PI * 2); ctx.stroke(); // 핸들
 
-    // 머리 (졸라맨 시그니처: 흰 배경 + 캐릭터 색 테두리)
+    // 머리 (졸라맨 시그니처: 흰 배경 + 캐릭터 색 테두리) — 그을린 동안은 몸통뿐 아니라
+    // 가장 눈에 잘 띄는 흰 머리까지 그을린 색으로 덮어야 "까맣게 탔다"가 실제로 눈에 들어온다
     const flash = k.stunT > 0 || k.spinT > 0;
+    const burning = k.lightningT > 0 || k.burnT > 0;
+    // 스턴/스핀 표시는 빨간색으로 고정하지 않는다 — 원래 색이 빨강인 캐릭터(예: 브라운)와
+    // 헷갈리므로, 대신 흰색/호박색이 번갈아 깜빡이는 스트로브로 표현해 캐릭터 색과 무관하게 항상 구분되게 한다.
     ctx.beginPath(); ctx.arc(-3, 0, 9.5, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff"; ctx.fill();
-    ctx.strokeStyle = flash ? "#ff2d1a" : k.color; ctx.lineWidth = 3.4; ctx.stroke();
-    // 얼굴(전방을 보는 눈)
-    ctx.fillStyle = "#1c2030";
+    ctx.fillStyle = burning ? bodyColor : "#fff"; ctx.fill();
+    ctx.strokeStyle = flash ? (Math.floor(raceT * 14) % 2 === 0 ? "#fff" : "#ffcf4d") : k.color;
+    ctx.lineWidth = flash ? 4.2 : 3.4; ctx.stroke();
+    // 얼굴(전방을 보는 눈) — 머리가 그을려 어두워진 동안엔 눈도 밝은 색으로 바꿔야 다크온다크로 묻히지 않는다
+    ctx.fillStyle = burning ? "#ffd23c" : "#1c2030";
     ctx.beginPath(); ctx.arc(0.5, -2, 1.5, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(0.5, 2, 1.5, 0, Math.PI * 2); ctx.fill();
 
@@ -4084,7 +4538,7 @@ window.GameRecorder = (() => {
     const tw = ctx.measureText(label).width;
     const iconW = hasItem ? 22 : 0;
     const bw = tw + 14 + iconW, bh = 20, bx = k.sx - bw / 2, by = k.sy - 40 * (s / 1.4);
-    roundRect(bx, by, bw, bh, 7); ctx.fillStyle = "#fff"; ctx.fill();
+    roundRect(ctx, bx, by, bw, bh, 7); ctx.fillStyle = "#fff"; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = k.color; ctx.stroke();
     ctx.fillStyle = "#1c2030";
     ctx.fillText(label, bx + 7 + tw / 2, by + bh / 2 + 0.5);
@@ -4098,14 +4552,59 @@ window.GameRecorder = (() => {
   function drawPickup(pk) {
     if (pk.taken) return;
     const p = posAtScreen(pk.progress, pk.lane, "A");
-    const s = Math.min(1, pk.popT) * (1 + Math.sin(raceT * 6 + pk.lane) * 0.06);
+    const s = Math.min(1, pk.popT) * (1 + Math.sin(raceT * 6 + pk.lane) * 0.08);
+    const bob = Math.sin(raceT * 3 + pk.lane) * 2.6; // 살짝 위아래로 둥실
     ctx.save();
-    ctx.translate(p.x, p.y); ctx.scale(s, s);
-    roundRect(-13, -13, 26, 26, 7);
-    ctx.fillStyle = "#fff"; ctx.fill();
-    ctx.lineWidth = 2.4; ctx.strokeStyle = "#f2a900"; ctx.stroke();
-    ctx.font = "16px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("❓", 0, 1);
+    ctx.translate(p.x, p.y + bob); ctx.scale(s, s);
+
+    // 빛나는 후광 — 기존보다 더 크고 밝게 펄스
+    const glowPulse = 0.75 + Math.sin(raceT * 4 + pk.lane) * 0.25;
+    const glowR = 30 * glowPulse;
+    const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, glowR);
+    glow.addColorStop(0, "rgba(170,225,255,.7)");
+    glow.addColorStop(0.55, "rgba(150,215,255,.3)");
+    glow.addColorStop(1, "rgba(150,215,255,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0, 0, glowR, 0, Math.PI * 2); ctx.fill();
+
+    // 반짝이는 별빛 4개가 큐브 주위를 빙글빙글 — 더 화려하게
+    ctx.font = "9px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let i = 0; i < 4; i++) {
+      const a = raceT * 2.4 + (i * Math.PI) / 2;
+      const r = 19 + Math.sin(raceT * 5 + i) * 3;
+      ctx.save();
+      ctx.globalAlpha = 0.55 + Math.sin(raceT * 7 + i * 2) * 0.45;
+      ctx.translate(Math.cos(a) * r, Math.sin(a) * r * 0.7);
+      ctx.fillText("✦", 0, 0);
+      ctx.restore();
+    }
+
+    // 반투명하게 빛나는 정육면체(아이소메트릭 3면, 기존보다 25% 확대), 천천히 좌우로 흔들리며 회전
+    ctx.save();
+    ctx.rotate(Math.sin(raceT * 1.6 + pk.lane) * 0.2);
+    const cs = 14;
+    ctx.globalAlpha = 0.9;
+    ctx.shadowColor = "rgba(180,225,255,.9)"; ctx.shadowBlur = 12;
+    ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255,255,255,.95)";
+    ctx.beginPath(); // 윗면
+    ctx.moveTo(0, -cs); ctx.lineTo(cs * 0.87, -cs * 0.5); ctx.lineTo(0, 0); ctx.lineTo(-cs * 0.87, -cs * 0.5);
+    ctx.closePath(); ctx.fillStyle = "rgba(225,245,255,.92)"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); // 왼쪽면
+    ctx.moveTo(-cs * 0.87, -cs * 0.5); ctx.lineTo(0, 0); ctx.lineTo(0, cs); ctx.lineTo(-cs * 0.87, cs * 0.5);
+    ctx.closePath(); ctx.fillStyle = "rgba(110,180,255,.55)"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); // 오른쪽면
+    ctx.moveTo(cs * 0.87, -cs * 0.5); ctx.lineTo(0, 0); ctx.lineTo(0, cs); ctx.lineTo(cs * 0.87, cs * 0.5);
+    ctx.closePath(); ctx.fillStyle = "rgba(165,220,255,.72)"; ctx.fill(); ctx.stroke();
+    // 윗면 위를 스치는 하이라이트 반사광
+    ctx.globalAlpha = 0.5 + Math.sin(raceT * 6) * 0.3;
+    ctx.beginPath(); ctx.moveTo(0, -cs); ctx.lineTo(cs * 0.4, -cs * 0.75); ctx.lineTo(0, -cs * 0.5); ctx.lineTo(-cs * 0.4, -cs * 0.75);
+    ctx.closePath(); ctx.fillStyle = "#fff"; ctx.fill();
+    ctx.restore();
+
+    // 큐브 안에 둥실 떠 있는 물음표
+    ctx.font = "900 18px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(150,215,255,1)"; ctx.shadowBlur = 12;
+    ctx.fillStyle = "#fff"; ctx.fillText("?", 0, -1);
     ctx.restore();
   }
 
@@ -4117,28 +4616,61 @@ window.GameRecorder = (() => {
     for (const hz of hazards) {
       const x = hz.sx || 0, y = hz.sy || 0;
       ctx.save();
-      // 경고 반경 링(밟으면 걸리는 범위를 시각적으로 알려줌) + 살짝 흔들리는 바나나
-      ctx.globalAlpha = 0.45 + Math.sin(raceT * 5) * 0.15;
-      ctx.strokeStyle = "#f2c200"; ctx.lineWidth = 2; ctx.setLineDash([4, 5]);
-      ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]); ctx.globalAlpha = 1;
-      ctx.translate(x, y); ctx.rotate(Math.sin(raceT * 3) * 0.3);
-      ctx.font = "28px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText("🍌", 0, 0);
+      if (hz.kind === "bombfall") {
+        // 카운트다운 대신 포물선으로 던져지는 연출: 뜬 높이(heightFrac)가 커질수록 확대되고
+        // 화면상 위로 떠오르며, 바닥에는 착지 예상 지점을 알려주는 그림자가 옅게 남는다.
+        const hf = hz.heightFrac || 0;
+        const scale = 1 + hf * 1.5;
+        const liftPx = hf * 80 * TR.scale;
+        ctx.save(); // 그림자용 fillStyle 변경이 아래 이모지 렌더링에 새어들지 않도록 범위를 분리
+        ctx.globalAlpha = 0.3 * (1 - hf * 0.6);
+        ctx.fillStyle = "#000";
+        ctx.beginPath(); ctx.ellipse(x, y, 16 * (1 - hf * 0.4), 7 * (1 - hf * 0.4), 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.translate(x, y - liftPx); ctx.scale(scale, scale); ctx.rotate(raceT * 9);
+        ctx.font = "34px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("💣", 0, 0);
+      } else {
+        // 경고 반경 링(밟으면 걸리는 범위를 시각적으로 알려줌) + 살짝 흔들리는 바나나
+        ctx.globalAlpha = 0.45 + Math.sin(raceT * 5) * 0.15;
+        ctx.strokeStyle = "#f2c200"; ctx.lineWidth = 2; ctx.setLineDash([4, 5]);
+        ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+        ctx.translate(x, y); ctx.rotate(Math.sin(raceT * 3) * 0.3);
+        ctx.font = "28px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("🍌", 0, 0);
+      }
       ctx.restore();
     }
     for (const pr of projectiles) {
       const x = pr.sx || 0, y = pr.sy || 0;
-      ctx.save();
-      // 이글거리는 후광 + 큰 불덩이
       const pulse = 1 + Math.sin(raceT * 20) * 0.15;
-      const grad = ctx.createRadialGradient(x, y, 2, x, y, 16 * pulse);
-      grad.addColorStop(0, "rgba(255,230,120,.95)");
-      grad.addColorStop(0.5, "rgba(255,120,40,.75)");
+      const fireR = 30 * pulse;
+      // 관성 때문에 불꽃은 진행 반대방향으로 이글거리며 늘어져야 자연스럽다 — 진행각의 반대로
+      // 회전시킨 좌표계에서 뒤로 길쭉한 타원 그라디언트를 먼저 깔고, 그 위에 중심 불덩이를 얹는다.
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate((pr.angle || 0) + Math.PI);
+      const trailLen = fireR * 2.2;
+      const trailGrad = ctx.createLinearGradient(0, 0, trailLen, 0);
+      trailGrad.addColorStop(0, "rgba(255,200,90,.8)");
+      trailGrad.addColorStop(0.55, "rgba(255,110,40,.4)");
+      trailGrad.addColorStop(1, "rgba(255,60,20,0)");
+      ctx.fillStyle = trailGrad;
+      ctx.beginPath();
+      ctx.ellipse(trailLen * 0.52, 0, trailLen * 0.52, fireR * 0.48, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      // 이글거리는 후광 + 큰 불덩이 — 기존 대비 훨씬 크게(반지름 16→30 부근)
+      const grad = ctx.createRadialGradient(x, y, 2, x, y, fireR);
+      grad.addColorStop(0, "rgba(255,235,140,.95)");
+      grad.addColorStop(0.45, "rgba(255,120,40,.8)");
       grad.addColorStop(1, "rgba(255,60,20,0)");
       ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(x, y, 16 * pulse, 0, Math.PI * 2); ctx.fill();
-      ctx.font = "22px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.beginPath(); ctx.arc(x, y, fireR, 0, Math.PI * 2); ctx.fill();
+      ctx.font = "40px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText("🔥", x, y);
       ctx.restore();
     }
@@ -4146,12 +4678,26 @@ window.GameRecorder = (() => {
     const order = [...karts].sort((a, b) => a.sy - b.sy);
     for (const k of order) drawKartShape(k);
 
+    drawFogOverlay(); // 안개: 트랙/카트는 가리되, 이후 그려지는 파티클(획득/피격 텍스트)은 위에 또렷이 보이게
+
     for (const p of particles) {
       ctx.save(); ctx.globalAlpha = Math.max(0, p.life);
       if (p.type === "txt") {
         ctx.font = "800 13px 'Apple SD Gothic Neo',system-ui,sans-serif"; ctx.textAlign = "center";
         ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.strokeText(p.text, p.x, p.y);
         ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+      } else if (p.type === "ring") { // 폭탄 충격파: 커지면서 옅어지는 원형 링
+        const r = p.r0 + (p.r1 - p.r0) * (1 - p.life);
+        ctx.lineWidth = 4 * p.life + 1; ctx.strokeStyle = p.color || "#f2a900";
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+      } else if (p.type === "flash") { // 폭발 순간 확 밝아지는 플래시 — 화려함을 더한다
+        const r = p.r1 * (1 - p.life * 0.25);
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        g.addColorStop(0, `rgba(255,255,240,${0.9 * p.life})`);
+        g.addColorStop(0.5, `rgba(255,205,110,${0.55 * p.life})`);
+        g.addColorStop(1, "rgba(255,170,70,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
       } else {
         ctx.fillStyle = p.color || "#aeb8c6";
         ctx.beginPath(); ctx.arc(p.x, p.y, 3 * p.life + 1, 0, Math.PI * 2); ctx.fill();
@@ -4163,6 +4709,8 @@ window.GameRecorder = (() => {
       ctx.translate(c.x, c.y); ctx.rotate(c.rot); ctx.fillStyle = c.color;
       ctx.fillRect(-c.size / 2, -c.size / 2, c.size, c.size * 0.6); ctx.restore();
     }
+
+    drawLightningBolts(); // 번개: 화면 전체 플래시 + 지그재그 번개 줄기, 맨 위에 그려서 확실히 눈에 띄게
 
     if (state === "racing" || state === "done") drawHud();
     if (state === "done") drawKartResultBanner();
@@ -4181,9 +4729,74 @@ window.GameRecorder = (() => {
     const tw = ctx.measureText(text).width;
     const bw = Math.min(tw + 36, W - 40), bh = 40;
     const cx = W / 2, by = 52;
-    roundRect(cx - bw / 2, by, bw, bh, 12); ctx.fillStyle = "#1c2030"; ctx.fill();
+    roundRect(ctx, cx - bw / 2, by, bw, bh, 12); ctx.fillStyle = "#1c2030"; ctx.fill();
     ctx.fillStyle = "#fff"; ctx.fillText(clipText(text, bw - 24), cx, by + bh / 2 + 1);
     ctx.restore();
+  }
+
+  // 안개: 안개를 쓴 카트 주변만 살짝 걷어내서 "이 사람만 잘 보인다"를 표현한다
+  // 안개: 화면 전체를 어둡게 덮어 시야를 가리고, 안개를 쓴 카트 주변만 그 어둠에
+  // 구멍을 뚫어(destination-out) 원래 밝기를 되살린 뒤 그 위에 따뜻한 빛까지 더해서
+  // "그 사람만 밝고 나머지는 안개 속" 인상을 준다.
+  function drawFogOverlay() {
+    if (fog.t <= 0) return;
+    const alpha = Math.min(1, fog.t) * 0.62; // 시작/끝에서 부드럽게 페이드
+    ctx.save();
+    ctx.fillStyle = `rgba(16,18,26,${alpha})`;
+    ctx.fillRect(0, 0, W, H);
+    if (fog.immune) {
+      ctx.globalCompositeOperation = "destination-out";
+      const r = 105;
+      const holeGrad = ctx.createRadialGradient(fog.immune.sx, fog.immune.sy, 0, fog.immune.sx, fog.immune.sy, r);
+      holeGrad.addColorStop(0, "rgba(0,0,0,1)"); holeGrad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = holeGrad;
+      ctx.beginPath(); ctx.arc(fog.immune.sx, fog.immune.sy, r, 0, Math.PI * 2); ctx.fill();
+
+      ctx.globalCompositeOperation = "lighter"; // 되살린 구멍 위에 따뜻한 빛을 얹어 더 밝아 보이게
+      const glowGrad = ctx.createRadialGradient(fog.immune.sx, fog.immune.sy, 0, fog.immune.sx, fog.immune.sy, r * 0.75);
+      glowGrad.addColorStop(0, "rgba(255,250,225,.55)");
+      glowGrad.addColorStop(1, "rgba(255,250,225,0)");
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath(); ctx.arc(fog.immune.sx, fog.immune.sy, r * 0.75, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 번개: 위에서 내리꽂히는 지그재그 줄기 + 정점에서 화면 전체 플래시
+  function drawLightningBolts() {
+    // 번개 예고: 사용하는 순간부터(0.5초 전조) 화면이 즉시 어두워져 폭풍 전야 같은 긴장감을 준다 —
+    // 실제로 내리꽂히는 순간(플래시)까지 계속 유지된다.
+    if (lightningCasts.length) {
+      const darkAlpha = 0.46 + Math.sin(raceT * 11) * 0.07;
+      ctx.save(); ctx.globalAlpha = darkAlpha; ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H); ctx.restore();
+    }
+    for (const lb of lightningBolts) {
+      const alpha = Math.max(0, Math.min(1, lb.life * 2.2));
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = "#ffe14c"; ctx.shadowBlur = 22;
+      ctx.strokeStyle = "#fff8c9"; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      const steps = 6, topY = Math.max(-20, lb.y - 280);
+      ctx.beginPath(); ctx.moveTo(lb.x, topY);
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const jitter = (1 - t) * 24;
+        ctx.lineTo(lb.x + (Math.random() - 0.5) * jitter, topY + (lb.y - topY) * t + (Math.random() - 0.5) * 8);
+      }
+      ctx.lineTo(lb.x, lb.y);
+      ctx.stroke();
+      ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
+      ctx.restore();
+    }
+    if (lightningBolts.some(lb => lb.life > 0.4)) {
+      ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H); ctx.restore();
+    }
+    // 번개가 친 직후엔 밝은 플래시에 이어 아주 잠깐 화면이 어두워졌다 돌아온다(정전되는 듯한 느낌, 안개와 비슷한 어둠)
+    const afterFlash = lightningBolts.find(lb => lb.life <= 0.4);
+    if (afterFlash) {
+      const darkAlpha = (afterFlash.life / 0.4) * 0.4;
+      ctx.save(); ctx.globalAlpha = darkAlpha; ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H); ctx.restore();
+    }
   }
 
   function drawHud() {
@@ -4192,11 +4805,26 @@ window.GameRecorder = (() => {
       if (a.finished) return -1; if (b.finished) return 1;
       return raceProgress(b) - raceProgress(a);
     });
-    const leadLap = Math.min(TOTAL_LAPS, Math.max(...karts.map(k => k.finished ? TOTAL_LAPS : k.lap + 1)));
-    lapInfoEl.textContent = leadLap + "/" + TOTAL_LAPS + " 랩";
+    // 1등(가장 랩을 많이 돈 카트) 기준으로 완주까지 남은 랩 수를 계산하고,
+    // 바뀔 때(리더가 한 바퀴 돌 때)만 화면 중앙에 크게 짠! 띄웠다 사라지게 한다
+    const leadLapsDone = Math.max(...karts.map(k => k.finished ? TOTAL_LAPS : k.lap));
+    const lapsRemain = Math.max(0, TOTAL_LAPS - leadLapsDone);
+    if (lapsRemain !== lastPopLaps && ranked.length && !reduceMotion) {
+      lastPopLaps = lapsRemain;
+      lapPopNumEl.textContent = lapsRemain > 0 ? lapsRemain + "랩 남음" : "라스트 랩";
+      lapPopLeaderEl.textContent = "🏆 1위 " + ranked[0].name;
+      lapPopEl.classList.remove("show");
+      void lapPopEl.offsetWidth; // 강제 리플로우로 애니메이션 재시작
+      lapPopEl.classList.add("show");
+    } else {
+      lastPopLaps = lapsRemain;
+    }
     rankListEl.innerHTML = ranked.map((k, i) => {
       const rank = k.finished ? k.place : i + 1;
+      // 완주하지 않은 사람만 "본인 기준" 남은 랩 수를 함께 보여준다(완주자는 이미 0바퀴 남음이라 생략)
+      const lapBadge = k.finished ? "" : `<span class="lapown">${Math.max(0, TOTAL_LAPS - k.lap)}랩</span>`;
       return `<li><span style="color:${k.color}">●</span><span class="nm">${escapeHtml(k.name)}</span>` +
+        lapBadge +
         `<span class="lp">${k.finished ? rank + "등" : rank + "위"}</span></li>`;
     }).join("");
   }
@@ -4206,6 +4834,12 @@ window.GameRecorder = (() => {
     cdEl.classList.add("show");
     const go = label === "GO!";
     cdEl.innerHTML = `<div class="num anim${go ? " fight" : ""}">${label}</div>`;
+  }
+  // 1등 골인 후 남은 종료 카운트다운 — 같은 cd-layer를 재사용하되 캡션을 붙여 구분한다
+  function showFinishCd(label) {
+    if (!label) { cdEl.classList.remove("show"); cdEl.innerHTML = ""; return; }
+    cdEl.classList.add("show");
+    cdEl.innerHTML = `<div class="finish-cd"><div class="fcd-caption">⏱️ 레이스 종료까지</div><div class="num anim">${label}</div></div>`;
   }
 
   function loopStart() {
