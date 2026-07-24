@@ -157,6 +157,28 @@
   #muteBtn:active { transform: scale(.92); }
   #muteBtn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+  /* 게임 종료 후 뜨는 녹화 미리보기 박스 — 전 화면 공용, 어떤 .screen에도 속하지 않음 */
+  #recBox {
+    position: fixed; right: 14px; bottom: 14px; z-index: 61;
+    width: min(280px, calc(100vw - 28px));
+    background: #fff; border: 2.5px solid var(--ink); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 12px;
+    font-family: inherit;
+  }
+  #recBox h5 { margin: 0 0 8px; font-size: 13px; font-weight: 900; color: var(--ink); display: flex; justify-content: space-between; align-items: center; }
+  #recBox video { width: 100%; border-radius: 8px; border: 1.5px solid var(--ink); background: #000; display: block; }
+  #recBox .row { display: flex; gap: 8px; margin-top: 10px; }
+  #recBox .row a, #recBox .row button {
+    flex: 1; text-align: center; font-family: inherit; font-weight: 800; font-size: 13px;
+    padding: 9px; border-radius: 9px; border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
+    cursor: pointer; text-decoration: none;
+  }
+  #recBox .dl { background: var(--accent); color: #fff; }
+  #recBox .rc { background: #fff; color: var(--ink); }
+  #recClose {
+    background: none; border: none; font-size: 15px; cursor: pointer; color: var(--ink-soft); padding: 0 2px;
+  }
+
   /* countdown (공용) */
   .cd-layer {
     position: absolute; inset: 0; z-index: 25; display: none;
@@ -311,6 +333,10 @@
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: 10.5px; letter-spacing: .3em; color: #3c4468; margin-top: 8px;
   }
+  .menu-powered {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 9px; letter-spacing: .22em; color: #2a3054; margin-top: 4px;
+  }
 
   @media (prefers-reduced-motion: reduce) {
     #insertCoin, #menuInner, .cab.sel .sel-arrow, .cd-layer .num.anim, .result-layer.show { animation: none; }
@@ -365,10 +391,20 @@
 
     <div id="insertCoin">INSERT COIN — PRESS START</div>
     <div class="menu-credit">© 2026 SOSO GAMELAND · 1 CREDIT = FREE PLAY</div>
+    <div class="menu-powered">POWERED BY HEALINGPAPER</div>
   </div>
 </div>
 
 <button id="muteBtn" type="button" aria-pressed="false" title="배경음 켜기/끄기">🔊</button>
+
+<div id="recBox" hidden>
+  <h5><span>🎬 이번 판 영상</span><button id="recClose" aria-label="닫기">✕</button></h5>
+  <video id="recVideo" muted loop playsinline></video>
+  <div class="row">
+    <a id="recDownload" class="dl" download>⬇ 다운로드</a>
+    <button id="recDiscard" class="rc" type="button">닫기</button>
+  </div>
+</div>
 
 <script>
 // ================= shared: 라우터 + 명단 공유 + 비프음 =================
@@ -628,6 +664,78 @@ window.Router = {
       btn.setAttribute("aria-pressed", String(muted));
     });
   }
+})();
+
+// ================= 게임 화면 녹화 =================
+// 각 게임의 canvas를 캡처해 webm 영상으로 만든다. 결과 모달은 DOM이라 캡처되지 않으므로,
+// 각 게임은 state==="done"일 때 캔버스에도 결과를 직접 그려서(이미 4개 게임 모두 반영됨)
+// 영상 끝부분에 순위가 실제로 보이게 한다.
+window.GameRecorder = (() => {
+  let recorder = null, chunks = [], stream = null, active = false;
+  const SUPPORTED = typeof MediaRecorder !== "undefined" &&
+    typeof HTMLCanvasElement !== "undefined" && !!HTMLCanvasElement.prototype.captureStream;
+
+  function pickMime() {
+    for (const m of ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]) {
+      if (MediaRecorder.isTypeSupported(m)) return m;
+    }
+    return "";
+  }
+  function stopStream() {
+    if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch (e) { /* 무시 */ } }
+    stream = null;
+  }
+  function start(canvas) {
+    cancel();
+    if (!SUPPORTED) return;
+    try {
+      stream = canvas.captureStream(24);
+      chunks = [];
+      const mime = pickMime();
+      recorder = mime ? new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 1200000 }) : new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.start(500);
+      active = true;
+    } catch (e) { active = false; recorder = null; stopStream(); }
+  }
+  // 게임 종료 후 holdMs만큼 더 녹화(순위 배너·여운 애니메이션 포함)하고 webm Blob을 콜백으로 넘긴다.
+  function finish(holdMs, onDone) {
+    if (!active || !recorder) { onDone(null); return; }
+    setTimeout(() => {
+      const r = recorder;
+      if (!r || r.state === "inactive") { stopStream(); active = false; onDone(chunks.length ? new Blob(chunks, { type: "video/webm" }) : null); return; }
+      r.onstop = () => { stopStream(); active = false; onDone(chunks.length ? new Blob(chunks, { type: "video/webm" }) : null); };
+      r.stop();
+    }, holdMs);
+  }
+  function cancel() {
+    if (recorder && recorder.state !== "inactive") { try { recorder.stop(); } catch (e) { /* 무시 */ } }
+    stopStream(); active = false; chunks = []; recorder = null;
+  }
+  return { start, finish, cancel, get active() { return active; }, get supported() { return SUPPORTED; } };
+})();
+
+// 녹화 완료 후 보여주는 공용 미리보기 + 다운로드 박스
+(() => {
+  const box = document.getElementById("recBox");
+  if (!box) return;
+  const video = document.getElementById("recVideo");
+  const dl = document.getElementById("recDownload");
+  const closeBtn = document.getElementById("recClose");
+  let curUrl = null;
+  window.showRecording = (blob) => {
+    if (!blob || !blob.size) return;
+    if (curUrl) URL.revokeObjectURL(curUrl);
+    curUrl = URL.createObjectURL(blob);
+    video.src = curUrl;
+    dl.href = curUrl;
+    dl.download = "soso-gameland-" + Date.now() + ".webm";
+    box.hidden = false;
+    video.play().catch(() => { /* 자동재생 실패는 무시 — 미리보기 컨트롤로 재생 가능 */ });
+  };
+  window.hideRecording = () => { box.hidden = true; video.pause(); };
+  closeBtn.addEventListener("click", window.hideRecording);
+  document.getElementById("recDiscard").addEventListener("click", window.hideRecording);
 })();
 
 // ================= arcade menu =================
@@ -1170,6 +1278,8 @@ window.Router = {
   function beginBattle(names) {
     if (!names || names.length < 2) return;
     if (window.BGM) BGM.stop(); // 메뉴 음악 정지 — 카운트다운 동안은 무음
+    if (window.hideRecording) hideRecording();
+    if (window.GameRecorder) GameRecorder.start(canvas);
     const pts = spreadPositions(names.length);
     fighters = names.map((nm, i) => makeFighter(nm, i, pts[i]));
     particles = []; projectiles = []; confetti = []; shake = 0;
@@ -1426,6 +1536,7 @@ window.Router = {
     gameWinners = winners;
     showWinners(winners);
     if (!reduceMotion && winners[0]) launchConfetti(winners[0].color);
+    if (window.GameRecorder) GameRecorder.finish(3500, window.showRecording);
   }
 
   function showWinners(winners) {
@@ -2184,6 +2295,8 @@ window.Router = {
     resultEl.classList.remove("show");
     beep(740, 0.07);
     if (window.BGM) BGM.start("ladder"); // 사다리는 카운트다운이 없어 시작과 동시에 전환
+    if (window.hideRecording) hideRecording();
+    if (window.GameRecorder) GameRecorder.start(canvas);
     if (!rafId) loopStart();
   }
   function backToSetup() {
@@ -2291,6 +2404,7 @@ window.Router = {
         `<span class="wweap">${escapeHtml(out)}</span></div>`;
     }).join("");
     resultEl.classList.add("show");
+    if (window.GameRecorder) GameRecorder.finish(3000, window.showRecording);
   }
 
   function roundRect(x, y, w, h, r) {
@@ -2780,6 +2894,8 @@ window.Router = {
   // ---------- 레이스 ----------
   function startRace(defs) {
     if (window.BGM) BGM.stop(); // 메뉴 음악 정지 — 카운트다운 동안은 무음
+    if (window.hideRecording) hideRecording();
+    if (window.GameRecorder) GameRecorder.start(canvas);
     computeTrack();
     const K = defs.length;
     const maxM = Math.max(...defs.map(d => d.members.length));
@@ -2938,6 +3054,7 @@ window.Router = {
         `<span class="wweap">${l.place === 1 ? "🏆" : l.place === 2 ? "🥈" : l.place === 3 ? "🥉" : ""}</span></div>`;
     }).join("");
     resultEl.classList.add("show");
+    if (window.GameRecorder) GameRecorder.finish(3500, window.showRecording);
   }
 
   // ---------- draw ----------
@@ -3508,6 +3625,8 @@ window.Router = {
     const names = parseNames();
     if (names.length < 2) return;
     if (window.BGM) BGM.stop();
+    if (window.hideRecording) hideRecording();
+    if (window.GameRecorder) GameRecorder.start(canvas);
     karts = names.map(makeKart);
     projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
     raceT = 0; firstFinishT = null; placesGiven = 0; nextPickupT = rFloat(1.5, 3);
@@ -3798,6 +3917,7 @@ window.Router = {
         `<span class="wweap">${k.place === 1 ? "🏆" : k.place === 2 ? "🥈" : k.place === 3 ? "🥉" : ""}</span></div>`;
     }).join("");
     resultEl.classList.add("show");
+    if (window.GameRecorder) GameRecorder.finish(3500, window.showRecording);
   }
 
   // ================= 렌더링 =================
@@ -4045,6 +4165,25 @@ window.Router = {
     }
 
     if (state === "racing" || state === "done") drawHud();
+    if (state === "done") drawKartResultBanner();
+  }
+
+  // 결과창(DOM 모달)은 화면 녹화(canvas.captureStream)에는 찍히지 않으므로,
+  // 캔버스 위에도 순위 배너를 직접 그려서 녹화 영상에 결과가 남도록 한다.
+  function drawKartResultBanner() {
+    const order = [...karts].sort((a, b) => a.place - b.place);
+    if (!order.length) return;
+    const champ = order[0];
+    const text = "🏆 " + champ.name + " 우승" + (order.length > 1 ? ` · 2위 ${order[1].name}` : "");
+    ctx.save();
+    ctx.font = "900 18px 'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const tw = ctx.measureText(text).width;
+    const bw = Math.min(tw + 36, W - 40), bh = 40;
+    const cx = W / 2, by = 52;
+    roundRect(cx - bw / 2, by, bw, bh, 12); ctx.fillStyle = "#1c2030"; ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.fillText(clipText(text, bw - 24), cx, by + bh / 2 + 1);
+    ctx.restore();
   }
 
   function drawHud() {
