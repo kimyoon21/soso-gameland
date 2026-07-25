@@ -157,26 +157,56 @@
   #muteBtn:active { transform: scale(.92); }
   #muteBtn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-  /* 게임 종료 후 뜨는 녹화 미리보기 박스 — 전 화면 공용, 어떤 .screen에도 속하지 않음 */
+  /* 게임 화면 녹화 상태 표시 — 전 화면 공용, 어떤 .screen에도 속하지 않음.
+     #recBox는 위치만 잡아주는 래퍼이고, 실제 모양은 .rec-badge(녹화 중, 작은 알약)와
+     .rec-card(생성 중·완료, 큰 카드) 둘 중 하나만 보여준다. */
   #recBox {
     position: fixed; right: 14px; bottom: 14px; z-index: 61;
+    font-family: inherit;
+  }
+  .rec-badge {
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(28,32,48,.85); color: #fff; font-weight: 800; font-size: 12.5px;
+    padding: 9px 14px; border-radius: 20px; border: 2px solid rgba(255,255,255,.25);
+    box-shadow: var(--shadow);
+  }
+  .rec-badge .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #ff3b30; flex: none;
+    animation: recPulse 1.1s ease-in-out infinite;
+  }
+  @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+  .rec-card {
     width: min(280px, calc(100vw - 28px));
     background: #fff; border: 2.5px solid var(--ink); border-radius: 14px;
     box-shadow: var(--shadow); padding: 12px;
-    font-family: inherit;
   }
-  #recBox h5 { margin: 0 0 8px; font-size: 13px; font-weight: 900; color: var(--ink); display: flex; justify-content: space-between; align-items: center; }
-  #recBox video { width: 100%; border-radius: 8px; border: 1.5px solid var(--ink); background: #000; display: block; }
-  #recBox .row { display: flex; gap: 8px; margin-top: 10px; }
-  #recBox .row a, #recBox .row button {
+  .rec-card h5 { margin: 0 0 8px; font-size: 13px; font-weight: 900; color: var(--ink); display: flex; justify-content: space-between; align-items: center; }
+  .rec-card video { width: 100%; border-radius: 8px; border: 1.5px solid var(--ink); background: #000; display: block; }
+  .rec-spinnerwrap {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    padding: 30px 0; color: var(--ink-soft); font-size: 12.5px; font-weight: 700;
+  }
+  .rec-spinner {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 3px solid rgba(28,32,48,.15); border-top-color: var(--accent);
+    animation: recSpin .8s linear infinite;
+  }
+  @keyframes recSpin { to { transform: rotate(360deg); } }
+  .rec-hint { font-size: 11px; color: var(--ink-soft); margin: 8px 0 0; line-height: 1.45; }
+  .rec-card .row { display: flex; gap: 8px; margin-top: 10px; }
+  .rec-card .row a, .rec-card .row button {
     flex: 1; text-align: center; font-family: inherit; font-weight: 800; font-size: 13px;
     padding: 9px; border-radius: 9px; border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
     cursor: pointer; text-decoration: none;
   }
-  #recBox .dl { background: var(--accent); color: #fff; }
-  #recBox .rc { background: #fff; color: var(--ink); }
+  .rec-card .dl { background: var(--accent); color: #fff; }
+  .rec-card .rc { background: #fff; color: var(--ink); }
   #recClose {
     background: none; border: none; font-size: 15px; cursor: pointer; color: var(--ink-soft); padding: 0 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rec-badge .dot, .rec-spinner { animation: none; }
   }
 
   /* countdown (공용) */
@@ -417,11 +447,16 @@
 <button id="muteBtn" type="button" aria-pressed="false" title="배경음 켜기/끄기">🔊</button>
 
 <div id="recBox" hidden>
-  <h5><span>🎬 이번 판 영상</span><button id="recClose" aria-label="닫기">✕</button></h5>
-  <video id="recVideo" muted loop playsinline></video>
-  <div class="row">
-    <a id="recDownload" class="dl" download>⬇ 다운로드</a>
-    <button id="recDiscard" class="rc" type="button">닫기</button>
+  <div id="recBadge" class="rec-badge" hidden><span class="dot"></span> 녹화 중</div>
+  <div id="recCard" class="rec-card" hidden>
+    <h5><span id="recTitle">🎬 영상 만드는 중…</span><button id="recClose" aria-label="닫기">✕</button></h5>
+    <div id="recSpinnerWrap" class="rec-spinnerwrap"><div class="rec-spinner"></div><span>영상 만드는 중…</span></div>
+    <video id="recVideo" muted loop playsinline hidden></video>
+    <p id="recHint" class="rec-hint" hidden></p>
+    <div class="row">
+      <a id="recDownload" class="dl" download hidden>⬇ 다운로드</a>
+      <button id="recDiscard" class="rc" type="button">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -690,16 +725,19 @@ window.Router = {
 // 각 게임은 state==="done"일 때 캔버스에도 결과를 직접 그려서(이미 4개 게임 모두 반영됨)
 // 영상 끝부분에 순위가 실제로 보이게 한다.
 window.GameRecorder = (() => {
-  let recorder = null, chunks = [], stream = null, active = false;
+  let recorder = null, chunks = [], stream = null, active = false, chosenMime = "";
   const SUPPORTED = typeof MediaRecorder !== "undefined" &&
     typeof HTMLCanvasElement !== "undefined" && !!HTMLCanvasElement.prototype.captureStream;
 
+  // mp4를 먼저 시도한다 — 지원되면 다운로드한 파일을 어디서나(맥 미리보기·윈도우 기본 재생기 등)
+  // 별도 프로그램 없이 바로 열 수 있다. 미지원 브라우저에서는 webm으로 자동 대체.
   function pickMime() {
-    for (const m of ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]) {
+    for (const m of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]) {
       if (MediaRecorder.isTypeSupported(m)) return m;
     }
     return "";
   }
+  function extOf(mime) { return mime && mime.indexOf("mp4") !== -1 ? "mp4" : "webm"; }
   function stopStream() {
     if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch (e) { /* 무시 */ } }
     stream = null;
@@ -710,20 +748,24 @@ window.GameRecorder = (() => {
     try {
       stream = canvas.captureStream(24);
       chunks = [];
-      const mime = pickMime();
-      recorder = mime ? new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 1200000 }) : new MediaRecorder(stream);
+      chosenMime = pickMime();
+      recorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime, videoBitsPerSecond: 1200000 }) : new MediaRecorder(stream);
       recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
       recorder.start(500);
       active = true;
     } catch (e) { active = false; recorder = null; stopStream(); }
   }
-  // 게임 종료 후 holdMs만큼 더 녹화(순위 배너·여운 애니메이션 포함)하고 webm Blob을 콜백으로 넘긴다.
+  function buildBlob() {
+    if (!chunks.length) return null;
+    return new Blob(chunks, { type: chosenMime || "video/webm" });
+  }
+  // 게임 종료 후 holdMs만큼 더 녹화(순위 배너·여운 애니메이션 포함)하고 Blob + 확장자를 콜백으로 넘긴다.
   function finish(holdMs, onDone) {
-    if (!active || !recorder) { onDone(null); return; }
+    if (!active || !recorder) { onDone(null, extOf(chosenMime)); return; }
     setTimeout(() => {
       const r = recorder;
-      if (!r || r.state === "inactive") { stopStream(); active = false; onDone(chunks.length ? new Blob(chunks, { type: "video/webm" }) : null); return; }
-      r.onstop = () => { stopStream(); active = false; onDone(chunks.length ? new Blob(chunks, { type: "video/webm" }) : null); };
+      if (!r || r.state === "inactive") { stopStream(); active = false; onDone(buildBlob(), extOf(chosenMime)); return; }
+      r.onstop = () => { stopStream(); active = false; onDone(buildBlob(), extOf(chosenMime)); };
       r.stop();
     }, holdMs);
   }
@@ -734,25 +776,53 @@ window.GameRecorder = (() => {
   return { start, finish, cancel, get active() { return active; }, get supported() { return SUPPORTED; } };
 })();
 
-// 녹화 완료 후 보여주는 공용 미리보기 + 다운로드 박스
+// 녹화 상태 표시 — 녹화 중(작은 배지) → 영상 만드는 중(카드+스피너) → 완료(미리보기+다운로드)
 (() => {
   const box = document.getElementById("recBox");
   if (!box) return;
+  const badge = document.getElementById("recBadge");
+  const card = document.getElementById("recCard");
+  const title = document.getElementById("recTitle");
+  const spinnerWrap = document.getElementById("recSpinnerWrap");
   const video = document.getElementById("recVideo");
+  const hint = document.getElementById("recHint");
   const dl = document.getElementById("recDownload");
   const closeBtn = document.getElementById("recClose");
-  let curUrl = null;
-  window.showRecording = (blob) => {
-    if (!blob || !blob.size) return;
+  let curUrl = null, dismissed = false;
+
+  window.showRecordingBadge = () => {
+    dismissed = false;
+    box.hidden = false; badge.hidden = false; card.hidden = true;
+  };
+  window.showProcessing = () => {
+    if (dismissed) return; // 사용자가 이미 닫았으면 재등장시키지 않음
+    box.hidden = false; badge.hidden = true; card.hidden = false;
+    title.textContent = "🎬 영상 만드는 중…";
+    spinnerWrap.hidden = false; video.hidden = true; dl.hidden = true; hint.hidden = true;
+  };
+  window.showRecording = (blob, ext) => {
+    if (dismissed) return;
+    if (!blob || !blob.size) { window.hideRecording(); return; }
     if (curUrl) URL.revokeObjectURL(curUrl);
     curUrl = URL.createObjectURL(blob);
-    video.src = curUrl;
-    dl.href = curUrl;
-    dl.download = "soso-gameland-" + Date.now() + ".webm";
-    box.hidden = false;
+    ext = ext || "webm";
+    box.hidden = false; badge.hidden = true; card.hidden = false;
+    title.textContent = "🎬 이번 판 영상";
+    spinnerWrap.hidden = true;
+    video.hidden = false; video.src = curUrl;
+    dl.hidden = false; dl.href = curUrl; dl.download = "soso-gameland-" + Date.now() + "." + ext;
+    if (ext === "webm") {
+      hint.hidden = false;
+      hint.textContent = "webm 파일은 크롬·엣지·파이어폭스 탭에 끌어다 놓으면 재생돼요. 맥에서는 무료 VLC 플레이어로도 열 수 있어요.";
+    } else {
+      hint.hidden = true;
+    }
     video.play().catch(() => { /* 자동재생 실패는 무시 — 미리보기 컨트롤로 재생 가능 */ });
   };
-  window.hideRecording = () => { box.hidden = true; video.pause(); };
+  window.hideRecording = () => {
+    dismissed = true;
+    box.hidden = true; video.pause();
+  };
   closeBtn.addEventListener("click", window.hideRecording);
   document.getElementById("recDiscard").addEventListener("click", window.hideRecording);
 })();
@@ -1306,7 +1376,7 @@ window.GameRecorder = (() => {
     if (!names || names.length < 2) return;
     if (window.BGM) BGM.stop(); // 메뉴 음악 정지 — 카운트다운 동안은 무음
     if (window.hideRecording) hideRecording();
-    if (window.GameRecorder) GameRecorder.start(canvas);
+    if (window.GameRecorder) { GameRecorder.start(canvas); if (GameRecorder.active && window.showRecordingBadge) showRecordingBadge(); }
     const pts = spreadPositions(names.length);
     fighters = names.map((nm, i) => makeFighter(nm, i, pts[i]));
     particles = []; projectiles = []; confetti = []; shake = 0;
@@ -1563,7 +1633,7 @@ window.GameRecorder = (() => {
     gameWinners = winners;
     showWinners(winners);
     if (!reduceMotion && winners[0]) launchConfetti(winners[0].color);
-    if (window.GameRecorder) GameRecorder.finish(3500, window.showRecording);
+    if (window.GameRecorder) { if (window.showProcessing) showProcessing(); GameRecorder.finish(3500, window.showRecording); }
   }
 
   function showWinners(winners) {
@@ -2323,7 +2393,7 @@ window.GameRecorder = (() => {
     beep(740, 0.07);
     if (window.BGM) BGM.start("ladder"); // 사다리는 카운트다운이 없어 시작과 동시에 전환
     if (window.hideRecording) hideRecording();
-    if (window.GameRecorder) GameRecorder.start(canvas);
+    if (window.GameRecorder) { GameRecorder.start(canvas); if (GameRecorder.active && window.showRecordingBadge) showRecordingBadge(); }
     if (!rafId) loopStart();
   }
   function backToSetup() {
@@ -2431,7 +2501,7 @@ window.GameRecorder = (() => {
         `<span class="wweap">${escapeHtml(out)}</span></div>`;
     }).join("");
     resultEl.classList.add("show");
-    if (window.GameRecorder) GameRecorder.finish(3000, window.showRecording);
+    if (window.GameRecorder) { if (window.showProcessing) showProcessing(); GameRecorder.finish(3000, window.showRecording); }
   }
 
   function roundRect(x, y, w, h, r) {
@@ -2922,7 +2992,7 @@ window.GameRecorder = (() => {
   function startRace(defs) {
     if (window.BGM) BGM.stop(); // 메뉴 음악 정지 — 카운트다운 동안은 무음
     if (window.hideRecording) hideRecording();
-    if (window.GameRecorder) GameRecorder.start(canvas);
+    if (window.GameRecorder) { GameRecorder.start(canvas); if (GameRecorder.active && window.showRecordingBadge) showRecordingBadge(); }
     computeTrack();
     const K = defs.length;
     const maxM = Math.max(...defs.map(d => d.members.length));
@@ -3081,7 +3151,7 @@ window.GameRecorder = (() => {
         `<span class="wweap">${l.place === 1 ? "🏆" : l.place === 2 ? "🥈" : l.place === 3 ? "🥉" : ""}</span></div>`;
     }).join("");
     resultEl.classList.add("show");
-    if (window.GameRecorder) GameRecorder.finish(3500, window.showRecording);
+    if (window.GameRecorder) { if (window.showProcessing) showProcessing(); GameRecorder.finish(3500, window.showRecording); }
   }
 
   // ---------- draw ----------
@@ -3771,7 +3841,7 @@ window.GameRecorder = (() => {
     if (names.length < 2) return;
     if (window.BGM) BGM.stop();
     if (window.hideRecording) hideRecording();
-    if (window.GameRecorder) GameRecorder.start(canvas);
+    if (window.GameRecorder) { GameRecorder.start(canvas); if (GameRecorder.active && window.showRecordingBadge) showRecordingBadge(); }
     karts = names.map(makeKart);
     // 출발 대열: 다들 좁게 뭉쳐서 출발하면 그 자리에서 바로 부딪히므로, 여러 열(가로)×여러 줄(세로)의
     // 격자로 넓게 퍼뜨려 세운다. 격자 슬롯은 무작위로 섞어 배정해 이름 순서대로 정렬된 것처럼 보이지
@@ -4310,7 +4380,7 @@ window.GameRecorder = (() => {
         `<span class="wweap">${k.place === 1 ? "🏆" : k.place === 2 ? "🥈" : k.place === 3 ? "🥉" : ""}</span></div>`;
     }).join("");
     resultEl.classList.add("show");
-    if (window.GameRecorder) GameRecorder.finish(3500, window.showRecording);
+    if (window.GameRecorder) { if (window.showProcessing) showProcessing(); GameRecorder.finish(3500, window.showRecording); }
   }
 
   // ================= 렌더링 =================
