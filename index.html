@@ -3448,43 +3448,11 @@ window.GameRecorder = (() => {
      어두운 도로 위에서 거의 안 보인다 — 이 게임에서만 흰 글자 + 짙은 아웃라인으로 덮어쓴다. */
   #game-kart .cd-layer .num { color: #fff; text-shadow: 0 0 16px rgba(0,0,0,.55), 4px 4px 0 rgba(28,32,48,.55); }
   #game-kart .cd-layer .num.fight { color: #ffd23c; text-shadow: 0 0 16px rgba(0,0,0,.6), 3px 3px 0 rgba(28,32,48,.55); }
-  .kart-hud {
-    position: absolute; top: 14px; left: 14px; z-index: 10;
-    width: 210px; max-height: calc(100% - 28px); overflow-y: auto;
-    background: rgba(255,255,255,.72); border: 2px solid var(--ink);
-    border-radius: 12px; box-shadow: var(--shadow); padding: 10px 12px;
-    font-size: 12.5px;
-  }
-  .kart-hud h4 { margin: 0 0 8px; font-size: 13px; font-weight: 900; display: flex; justify-content: space-between; }
-  .kart-hud .lapn { color: var(--accent-deep); font-variant-numeric: tabular-nums; }
-  .kart-hud ol { margin: 0; padding-left: 18px; }
-  .kart-hud li { font-weight: 700; margin-bottom: 3px; display: flex; gap: 6px; align-items: center; }
-  .kart-hud li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .kart-hud li .lp { color: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
-  .kart-hud li .lapown { color: var(--accent-deep); font-size: 10.5px; font-weight: 800; flex: none; font-variant-numeric: tabular-nums; }
+  /* 순위 HUD와 랩 리더 팝업은 DOM으로 안 그린다 — canvas.captureStream() 녹화엔 DOM이
+     안 찍히는데, 이 둘은 반투명 배경이라 캔버스에 같은 내용을 겹쳐 그리면 라이브 화면에서
+     이중으로 비쳐 보이는 문제가 있었다. 그래서 이 정보는 drawKartRankPanel/drawKartLapPop로
+     캔버스에만 그려서 라이브 화면과 녹화 영상이 항상 똑같이 보이게 한다. */
 
-  /* 남은 랩 수 + 1위 이름을 화면 중앙에 크게 짠! 띄웠다가 사라지는 팝업 */
-  .kart-lap-pop {
-    position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; pointer-events: none;
-    opacity: 0; text-align: center;
-  }
-  .kart-lap-pop .lapnum {
-    font-size: clamp(56px, 11vw, 120px); font-weight: 900; color: var(--accent);
-    letter-spacing: -2px; text-shadow: 6px 6px 0 rgba(28,32,48,.16);
-  }
-  .kart-lap-pop .leader {
-    margin-top: 4px; font-size: clamp(20px, 3.4vw, 34px); font-weight: 800; color: var(--ink);
-    text-shadow: 3px 3px 0 rgba(255,255,255,.7);
-  }
-  .kart-lap-pop.show { animation: ktLapPop 2.4s cubic-bezier(.2,1,.3,1) both; }
-  @keyframes ktLapPop {
-    0% { opacity: 0; transform: scale(.5); }
-    14% { opacity: 1; transform: scale(1.12); }
-    22% { transform: scale(1); }
-    78% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(.94); }
-  }
   /* 1등 골인 후 레이스 종료까지 남은 10초 카운트다운(공용 cd-layer 재사용, 캡션만 추가) */
   .finish-cd { display: flex; flex-direction: column; align-items: center; }
   .finish-cd .fcd-caption {
@@ -3496,14 +3464,6 @@ window.GameRecorder = (() => {
 
 <div id="game-kart" class="screen paper" hidden>
   <canvas id="ktCanvas" class="stage"></canvas>
-  <div id="ktHud" class="kart-hud" hidden>
-    <h4><span>순위</span></h4>
-    <ol id="ktRankList"></ol>
-  </div>
-  <div id="ktLapPop" class="kart-lap-pop" aria-hidden="true">
-    <div class="lapnum"></div>
-    <div class="leader"></div>
-  </div>
 
   <div id="ktControls" class="topctl" hidden>
     <button id="ktRestart">↺ 다시 레이스</button>
@@ -3558,11 +3518,9 @@ window.GameRecorder = (() => {
   const setupEl = $("ktSetup"), namesEl = $("ktNames"), countEl = $("ktCount");
   const controls = $("ktControls"), cdEl = $("ktCountdown");
   const resultEl = $("ktResult"), resultList = $("ktResultList");
-  const hudEl = $("ktHud"), rankListEl = $("ktRankList");
-  const lapPopEl = $("ktLapPop"), lapPopNumEl = lapPopEl.querySelector(".lapnum"), lapPopLeaderEl = lapPopEl.querySelector(".leader");
   let lastPopLaps = null; // 남은 랩 수가 바뀔 때만(리더가 랩을 돌 때) 팝업을 새로 띄우기 위한 기억값
-  // 순위 HUD/랩 팝업은 DOM이라 녹화(canvas.captureStream)에 안 찍힌다 — 캔버스에도 같은 정보를
-  // 그려서(drawKartRankPanel/drawKartLapPop) 화면엔 기존 DOM이 그대로 보이되 녹화엔 결과가 남게 한다.
+  // 순위 HUD/랩 팝업을 DOM으로 그렸다면 canvas.captureStream() 녹화엔 안 찍힌다 —
+  // 그래서 캔버스에 직접 그린다(drawKartRankPanel/drawKartLapPop), 라이브 화면과 녹화 영상이 항상 같도록.
   let lapPopStartT = -999, lapPopNumText = "", lapPopLeaderName = "";
 
   const PALETTE = [
@@ -3883,19 +3841,18 @@ window.GameRecorder = (() => {
     postFinishCdLabel = null;
     state = "countdown"; cdStart = 0; cdLabel = "_";
     setupEl.style.display = "none";
-    controls.hidden = false; hudEl.hidden = false;
+    controls.hidden = false;
     resultEl.classList.remove("show");
     // 시작하자마자 뻔한 "N랩 남음"(총 랩수 그대로)이 뜨지 않도록, 처음 값과 같은 TOTAL_LAPS로 초기화해둔다 —
     // 그래야 실제로 리더가 첫 바퀴를 돌아 랩수가 줄어들 때부터 팝업이 뜬다.
-    lastPopLaps = TOTAL_LAPS; lapPopEl.classList.remove("show"); lapPopStartT = -999;
+    lastPopLaps = TOTAL_LAPS; lapPopStartT = -999;
     if (!rafId) loopStart();
   }
   function backToSetup() {
     state = "idle"; karts = []; projectiles = []; hazards = []; pickups = []; particles = []; confetti = [];
     lightningBolts = []; lightningCasts = []; fog = { t: 0, immune: null };
-    controls.hidden = true; hudEl.hidden = true;
+    controls.hidden = true;
     resultEl.classList.remove("show");
-    lapPopEl.classList.remove("show");
     cdEl.classList.remove("show"); cdEl.innerHTML = "";
     setupEl.style.display = "flex";
     stopLoop();
@@ -4288,7 +4245,7 @@ window.GameRecorder = (() => {
       for (const k of karts) {
         if (k === hz.owner || k.finished) continue;
         const kp = posAtScreen(k.progress, k.lane, k.branch);
-        if (Math.hypot(kp.x - hp.x, kp.y - hp.y) < 18 * TR.scale) {
+        if (Math.hypot(kp.x - hp.x, kp.y - hp.y) < 21.6 * TR.scale) { // 기존 18에서 20% 넓힘
           applyEffect(k, "spin", 0);
           beep(240, 0.12, "sawtooth", 0.04);
           hz.hit = true;
@@ -4707,7 +4664,7 @@ window.GameRecorder = (() => {
         // 경고 반경 링(밟으면 걸리는 범위를 시각적으로 알려줌) + 살짝 흔들리는 바나나
         ctx.globalAlpha = 0.45 + Math.sin(raceT * 5) * 0.15;
         ctx.strokeStyle = "#f2c200"; ctx.lineWidth = 2; ctx.setLineDash([4, 5]);
-        ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, 24, 0, Math.PI * 2); ctx.stroke(); // 실제 판정 반경(21.6*TR.scale)에 맞춰 20% 넓힘
         ctx.setLineDash([]); ctx.globalAlpha = 1;
         ctx.translate(x, y); ctx.rotate(Math.sin(raceT * 3) * 0.3);
         ctx.font = "28px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -4807,8 +4764,7 @@ window.GameRecorder = (() => {
     ctx.restore();
   }
 
-  // 실시간 순위 HUD(#ktHud)도 DOM이라 녹화엔 안 찍힌다 — 화면엔 기존 DOM 박스가 그대로 덮어 보이고,
-  // 이 캔버스 버전은 그 아래에 숨어있다가 녹화 영상에서만 드러난다(같은 위치·비슷한 스타일로 맞춤).
+  // 실시간 순위 리스트 — canvas.captureStream() 녹화에 남도록 DOM 대신 캔버스에 직접 그린다.
   function drawKartRankPanel(ranked) {
     if (!ranked.length) return;
     const pad = 10, lineH = 17, headH = 20, bx = 14, by = 14, bw = 172;
@@ -4849,8 +4805,8 @@ window.GameRecorder = (() => {
     ctx.restore();
   }
 
-  // 랩 리더가 바뀔 때 화면 중앙에 잠깐 뜨는 팝업(#ktLapPop)의 캔버스 버전 — CSS keyframe과
-  // 같은 타이밍(2.4초, ease-out-back 느낌)을 raceT 기준 경과시간으로 근사해 흉내낸다.
+  // 랩 리더가 바뀔 때 화면 중앙에 잠깐 뜨는 팝업 — 예전엔 CSS keyframe으로 그렸으나
+  // 캔버스로 옮겨서, raceT 기준 경과시간으로 같은 타이밍(2.4초)을 직접 근사한다.
   function drawKartLapPop() {
     const elapsed = raceT - lapPopStartT;
     if (elapsed < 0 || elapsed > 2.4 || !lapPopLeaderName) return;
@@ -4951,25 +4907,12 @@ window.GameRecorder = (() => {
     const lapsRemain = Math.max(0, TOTAL_LAPS - leadLapsDone);
     if (lapsRemain !== lastPopLaps && ranked.length && !reduceMotion) {
       lastPopLaps = lapsRemain;
-      lapPopNumEl.textContent = lapsRemain > 0 ? lapsRemain + "랩 남음" : "라스트 랩";
-      lapPopLeaderEl.textContent = "🏆 1위 " + ranked[0].name;
-      lapPopEl.classList.remove("show");
-      void lapPopEl.offsetWidth; // 강제 리플로우로 애니메이션 재시작
-      lapPopEl.classList.add("show");
       lapPopStartT = raceT;
       lapPopNumText = lapsRemain > 0 ? lapsRemain + "랩 남음" : "라스트 랩";
       lapPopLeaderName = "🏆 1위 " + ranked[0].name;
     } else {
       lastPopLaps = lapsRemain;
     }
-    rankListEl.innerHTML = ranked.map((k, i) => {
-      const rank = k.finished ? k.place : i + 1;
-      // 완주하지 않은 사람만 "본인 기준" 남은 랩 수를 함께 보여준다(완주자는 이미 0바퀴 남음이라 생략)
-      const lapBadge = k.finished ? "" : `<span class="lapown">${Math.max(0, TOTAL_LAPS - k.lap)}랩</span>`;
-      return `<li><span style="color:${k.color}">●</span><span class="nm">${escapeHtml(k.name)}</span>` +
-        lapBadge +
-        `<span class="lp">${k.finished ? rank + "등" : rank + "위"}</span></li>`;
-    }).join("");
     drawKartRankPanel(ranked);
     drawKartLapPop();
   }
