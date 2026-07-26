@@ -465,10 +465,13 @@ window.Router = {
 
 // 8비트풍 사운드 킷: beep(슬라이드 지원) + noise(타격/폭발) + throttle(연타 제한)
 (() => {
-  let ac = null;
+  let ac = null, recDest = null;
   const throttleMap = {};
   function ensure() {
     ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    // 녹화용 오디오 출력 — 스피커(a.destination)와 별개로 여기에도 fan-out해서
+    // GameRecorder가 canvas 영상 스트림과 합쳐 녹음할 수 있게 한다.
+    if (!recDest) recDest = ac.createMediaStreamDestination();
     if (ac.state === "suspended") ac.resume();
     return ac;
   }
@@ -480,7 +483,7 @@ window.Router = {
       if (slideTo > 0) o.frequency.exponentialRampToValueAtTime(slideTo, a.currentTime + dur);
       g.gain.setValueAtTime(vol, a.currentTime);
       g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
-      o.connect(g); g.connect(a.destination);
+      o.connect(g); g.connect(a.destination); g.connect(recDest);
       o.start(); o.stop(a.currentTime + dur);
     } catch (e) { /* 사운드 실패는 무시 */ }
   };
@@ -496,7 +499,7 @@ window.Router = {
       const g = a.createGain();
       g.gain.setValueAtTime(vol, a.currentTime);
       g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
-      src.connect(f); f.connect(g); g.connect(a.destination);
+      src.connect(f); f.connect(g); g.connect(a.destination); g.connect(recDest);
       src.start();
     } catch (e) { /* 무시 */ }
   };
@@ -505,6 +508,7 @@ window.Router = {
     if (!throttleMap[key] || t - throttleMap[key] >= ms) { throttleMap[key] = t; fn(); }
   };
   window.getAudioCtx = ensure;
+  window.getRecordDest = () => { ensure(); return recDest; };
 })();
 
 // ================= 8비트 칩튠 BGM 엔진 =================
@@ -582,6 +586,7 @@ window.Router = {
       musicGain = a.createGain();
       musicGain.gain.value = muted ? 0 : 1;
       musicGain.connect(a.destination);
+      if (window.getRecordDest) musicGain.connect(window.getRecordDest());
     }
     return a;
   }
@@ -710,31 +715,42 @@ window.Router = {
 // 각 게임은 state==="done"일 때 캔버스에도 결과를 직접 그려서(이미 4개 게임 모두 반영됨)
 // 영상 끝부분에 순위가 실제로 보이게 한다.
 window.GameRecorder = (() => {
-  let recorder = null, chunks = [], stream = null, active = false, chosenMime = "";
+  let recorder = null, chunks = [], canvasStream = null, active = false, chosenMime = "";
   const SUPPORTED = typeof MediaRecorder !== "undefined" &&
     typeof HTMLCanvasElement !== "undefined" && !!HTMLCanvasElement.prototype.captureStream;
 
   // mp4를 먼저 시도한다 — 지원되면 다운로드한 파일을 어디서나(맥 미리보기·윈도우 기본 재생기 등)
   // 별도 프로그램 없이 바로 열 수 있다. 미지원 브라우저에서는 webm으로 자동 대체.
-  function pickMime() {
-    for (const m of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]) {
+  // 오디오 트랙이 있으면 오디오 코덱까지 명시한 조합을 먼저 시도해야 브라우저가 제대로 합쳐준다.
+  function pickMime(hasAudio) {
+    const withAudio = ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4;codecs=h264,aac", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus"];
+    const videoOnly = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+    for (const m of (hasAudio ? withAudio.concat(videoOnly) : videoOnly)) {
       if (MediaRecorder.isTypeSupported(m)) return m;
     }
     return "";
   }
   function extOf(mime) { return mime && mime.indexOf("mp4") !== -1 ? "mp4" : "webm"; }
+  // canvas 캡처 스트림만 정지한다 — 오디오 트랙은 게임 전체가 공유하는 녹화용 오디오 목적지(getRecordDest)에서
+  // 나온 것이라, 여기서 stop()하면 다음 판 녹화의 오디오가 영구히 죽어버린다.
   function stopStream() {
-    if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch (e) { /* 무시 */ } }
-    stream = null;
+    if (canvasStream) { try { canvasStream.getTracks().forEach(t => t.stop()); } catch (e) { /* 무시 */ } }
+    canvasStream = null;
   }
   function start(canvas) {
     cancel();
     if (!SUPPORTED) return;
     try {
-      stream = canvas.captureStream(24);
+      canvasStream = canvas.captureStream(24);
+      const audioStream = window.getRecordDest ? window.getRecordDest().stream : null;
+      const hasAudio = !!(audioStream && audioStream.getAudioTracks().length);
+      const combined = hasAudio
+        ? new MediaStream([...canvasStream.getVideoTracks(), ...audioStream.getAudioTracks()])
+        : canvasStream;
       chunks = [];
-      chosenMime = pickMime();
-      recorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime, videoBitsPerSecond: 1200000 }) : new MediaRecorder(stream);
+      chosenMime = pickMime(hasAudio);
+      const opts = chosenMime ? { mimeType: chosenMime, videoBitsPerSecond: 1200000, audioBitsPerSecond: 96000 } : {};
+      recorder = new MediaRecorder(combined, opts);
       recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
       recorder.start(500);
       active = true;
