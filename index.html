@@ -1942,7 +1942,7 @@ window.GameRecorder = (() => {
 
   // ---------- draw ----------
   function draw() {
-    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#eef2f6"; ctx.fillRect(0, 0, W, H); // 녹화(canvas.captureStream)엔 투명 영역이 검게 나오므로 배경색을 직접 채운다
     if (state === "idle") return;
     ctx.save();
     if (shake > 0.2) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
@@ -2582,7 +2582,7 @@ window.GameRecorder = (() => {
   }
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#eef2f6"; ctx.fillRect(0, 0, W, H); // 녹화(canvas.captureStream)엔 투명 영역이 검게 나오므로 배경색을 직접 채운다
     if (state !== "play" || !ladder) return;
     const L = ladder;
 
@@ -3317,7 +3317,7 @@ window.GameRecorder = (() => {
   }
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#eef2f6"; ctx.fillRect(0, 0, W, H); // 녹화(canvas.captureStream)엔 투명 영역이 검게 나오므로 배경색을 직접 채운다
     if (state === "idle" || !lanes.length) return;
     drawTrack();
     const s = Math.max(0.48, Math.min(0.75, T.laneW / 30 + 0.32));
@@ -4640,7 +4640,7 @@ window.GameRecorder = (() => {
   }
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#eef2f6"; ctx.fillRect(0, 0, W, H); // 녹화(canvas.captureStream)엔 투명 영역이 검게 나오므로 배경색을 직접 채운다
     if (state === "idle") return;
     drawTrack();
     for (const pk of pickups) drawPickup(pk);
