@@ -747,11 +747,14 @@ window.GameRecorder = (() => {
       const combined = hasAudio
         ? new MediaStream([...canvasStream.getVideoTracks(), ...audioStream.getAudioTracks()])
         : canvasStream;
-      chunks = [];
+      // 각 recorder가 자기 배열만 붙잡는다 — 전역 chunks를 공유하면, cancel()로 멈춘 이전
+      // recorder의 마지막 ondataavailable이 뒤늦게 발화하며 새 판의 배열 맨 앞에 자기 꼬리를
+      // 밀어넣는다. 그러면 파일이 ftyp/moov 없이 moof로 시작해 유튜브·슬랙 업로드가 깨진다.
+      const myChunks = chunks = [];
       chosenMime = pickMime(hasAudio);
       const opts = chosenMime ? { mimeType: chosenMime, videoBitsPerSecond: 1200000, audioBitsPerSecond: 96000 } : {};
       recorder = new MediaRecorder(combined, opts);
-      recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.ondataavailable = (e) => { if (e.data && e.data.size) myChunks.push(e.data); };
       recorder.start(500);
       active = true;
     } catch (e) { active = false; recorder = null; stopStream(); }
