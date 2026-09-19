@@ -3,12 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SOSO GAMELAND</title>
-<meta name="description" content="레트로 오락실에서 게임을 골라 랜덤 추첨 — 배틀로얄·사다리타기·계주 달리기">
+<title>사다리타기·랜덤 추첨·팀 편성 — 소소한 오락실</title>
+<meta name="description" content="이름만 넣으면 끝. 사다리타기, 랜덤 당첨자 뽑기, 팀 편성, 순서 정하기를 졸라맨 미니게임으로 뽑아줍니다. 설치·로그인 없이 브라우저에서 바로 돌아가고, 결과를 영상으로 내려받아 공유할 수 있습니다.">
+<link rel="canonical" href="https://soso-gameland-production.up.railway.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="소소한 오락실">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:url" content="https://soso-gameland-production.up.railway.app/">
+<meta property="og:title" content="사다리타기·랜덤 추첨·팀 편성 — 소소한 오락실">
+<meta property="og:description" content="이름만 넣으면 졸라맨들이 대신 뽑아줍니다. 사다리타기·랜덤 추첨·팀 편성·순서 정하기. 설치 없이 바로 실행.">
+<meta property="og:image" content="https://soso-gameland-production.up.railway.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="사다리타기·랜덤 추첨·팀 편성 — 소소한 오락실">
+<meta name="twitter:description" content="이름만 넣으면 졸라맨들이 대신 뽑아줍니다. 설치 없이 바로 실행.">
+<meta name="twitter:image" content="https://soso-gameland-production.up.railway.app/og.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕹️</text></svg>">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"소소한 오락실","alternateName":"SOSO GAMELAND","url":"https://soso-gameland-production.up.railway.app/","applicationCategory":"GameApplication","operatingSystem":"Web","inLanguage":"ko","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"KRW"},"description":"이름을 입력하면 사다리타기·랜덤 추첨·팀 편성·순서 정하기를 미니게임 애니메이션으로 뽑아주는 무료 웹 도구. 설치와 로그인이 필요 없고 결과를 영상으로 내려받을 수 있다.","featureList":["사다리타기","랜덤 당첨자 추첨","랜덤 팀 편성","순서·순위 정하기","결과 영상 다운로드"]}
+</script>
 </head>
 <body>
 <style>
+  /* 화면엔 안 보이지만 크롤러·스크린리더는 읽는 텍스트 */
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
   /* ================= shared ================= */
   :root {
     --paper: #eef2f6;
@@ -380,6 +399,7 @@
 
 <div id="menu" class="screen">
   <div id="menuInner">
+    <h1 class="sr-only">소소한 오락실 — 사다리타기·랜덤 추첨·팀 편성 미니게임</h1>
     <div class="marquee-top">RANDOM PICKER SERIES</div>
     <canvas id="logoCanvas" width="10" height="10" aria-label="SOSO GAMELAND"></canvas>
     <div class="menu-sub">소 소 한 &nbsp;오 락 실</div>
@@ -5021,6 +5041,11 @@ window.GameRecorder = (() => {
 <script>
 // 초기 화면: 오락실 메뉴
 document.querySelectorAll(".screen").forEach(s => { s.hidden = s.id !== "menu"; });
+// 랜딩 페이지(/ladder/ 등)에서 넘어온 딥링크: ?game=ladder → 해당 게임 설정 화면으로 바로
+(() => {
+  const want = new URLSearchParams(location.search).get("game");
+  if (want && document.getElementById("game-" + want)) Router.go(want);
+})();
 </script>
 
 </body>

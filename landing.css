@@ -1,0 +1,25 @@
+/* 랜딩 공통 — 앱(index.html)과 같은 레트로 팔레트를 쓰되 읽기용으로 밝게 */
+*{box-sizing:border-box}
+body{margin:0;background:#0d1020;color:#e8ecf6;font:16px/1.75 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",system-ui,sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:720px;margin:0 auto;padding:40px 20px 80px}
+a{color:#35f0e0}
+header nav{font-size:13px;color:#7a8199;margin-bottom:32px}
+header nav a{color:#7a8199;text-decoration:none}
+header nav a:hover{color:#35f0e0}
+h1{font-size:30px;line-height:1.35;margin:0 0 20px;letter-spacing:-.02em}
+.lead{font-size:18px;line-height:1.8;color:#c3cadd;margin:0 0 28px}
+.cta{display:inline-block;background:linear-gradient(90deg,#ff2d78,#ff7a5c);color:#fff;font-weight:700;font-size:17px;text-decoration:none;padding:15px 30px;border-radius:10px;margin:8px 0 6px}
+.cta:hover{filter:brightness(1.1)}
+.meta{font-size:13px;color:#7a8199;margin:0 0 40px}
+h2{font-size:20px;margin:44px 0 14px;letter-spacing:-.01em}
+ul{padding-left:20px}
+li{margin:10px 0}
+ol li{margin:12px 0}
+b{color:#fff}
+.faq dt{font-weight:700;color:#fff;margin:22px 0 6px}
+.faq dd{margin:0;color:#c3cadd}
+.others{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;padding:0;list-style:none}
+.others a{display:block;border:1px solid #2a3150;border-radius:9px;padding:11px 15px;text-decoration:none;color:#e8ecf6;font-size:15px}
+.others a:hover{border-color:#35f0e0}
+footer{margin-top:64px;padding-top:22px;border-top:1px solid #222842;font-size:13px;color:#6a7190}
+@media(max-width:520px){h1{font-size:25px}.wrap{padding:28px 18px 60px}}
